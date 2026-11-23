@@ -1,4 +1,4 @@
-const CACHE_NAME = 'drivenote-shell-v1';
+const CACHE_NAME = 'drivenote-shell-v2';
 const SHELL_ASSETS = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', (event) => {
@@ -18,6 +18,10 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (url.origin !== location.origin) return;
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request))
+    fetch(event.request).then((res) => {
+      const copy = res.clone();
+      caches.open(CACHE_NAME).then((c) => c.put(event.request, copy));
+      return res;
+    }).catch(() => caches.match(event.request))
   );
 });

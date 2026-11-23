@@ -315,6 +315,7 @@
     driveFileId: null,
     driveFolderId: null,
     driveAttachFolderId: null,
+    lastSyncError: '',
     clientId: DEFAULT_GOOGLE_CLIENT_ID,
     data: null,
     pendingDiaryAttachment: null,
@@ -632,7 +633,13 @@
             showToast('Google 授權取消或未通過白名單驗證');
             return;
           }
+          if (resp.scope && !resp.scope.includes('drive.file')) {
+            state.lastSyncError = '授權時未勾選 Google 雲端硬碟（drive.file）權限，請重新登入並勾選該項。';
+            showToast(state.lastSyncError);
+            return;
+          }
           state.accessToken = resp.access_token;
+          state.lastSyncError = '';
           state.mode = 'google';
           enterWorkspace();
           await syncWithGoogleDrive(true);
@@ -647,7 +654,16 @@
   async function driveFetch(url, options = {}) {
     const headers = Object.assign({ Authorization: `Bearer ${state.accessToken}` }, options.headers || {});
     const res = await fetch(url, { ...options, headers });
-    if (!res.ok) throw new Error(`Drive API ${res.status}`);
+    if (!res.ok) {
+      let detail = '';
+      try {
+        const errJson = await res.json();
+        detail = errJson?.error?.message || JSON.stringify(errJson);
+      } catch {
+        try { detail = await res.text(); } catch {}
+      }
+      throw new Error(`HTTP ${res.status}: ${detail || res.statusText}`);
+    }
     return res;
   }
 
@@ -735,24 +751,29 @@
           body: JSON.stringify(state.data, null, 2)
         });
       } else {
-        const boundary = 'drivenote_sync_boundary';
-        const metadata = { name: DRIVE_DATA_FILE, parents: [state.driveFolderId], mimeType: 'application/json' };
-        const body = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${JSON.stringify(state.data, null, 2)}\r\n--${boundary}--`;
-        const uploadRes = await driveFetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+        const createRes = await driveFetch('https://www.googleapis.com/drive/v3/files?fields=id', {
           method: 'POST',
-          headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
-          body
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: DRIVE_DATA_FILE, parents: [state.driveFolderId], mimeType: 'application/json' })
         });
-        const uploaded = await uploadRes.json();
-        state.driveFileId = uploaded.id;
+        const created = await createRes.json();
+        state.driveFileId = created.id;
+        await driveFetch(`https://www.googleapis.com/upload/drive/v3/files/${state.driveFileId}?uploadType=media`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(state.data, null, 2)
+        });
       }
+      state.lastSyncError = '';
       updateSyncBadge('Drive 已同步', '#10B981');
       ensureDailyDriveBackup();
       renderAll();
       showToast('已與 Google Drive 完成同步');
-    } catch {
-      updateSyncBadge('離線暫存', '#F59E0B');
-      showToast('雲端同步失敗，變更已安全保存在本機');
+    } catch (err) {
+      state.lastSyncError = err?.message || '未知錯誤';
+      console.error('[DriveNote Sync Error]', state.lastSyncError);
+      updateSyncBadge('同步失敗（點設定查看原因）', '#EF4444');
+      showToast(`同步失敗：${state.lastSyncError.slice(0, 90)}`);
     }
   }
 
@@ -2042,6 +2063,11 @@
         <button id="btnCloseModal" type="button" class="text-slate-400 hover:text-slate-700 text-2xl leading-none">×</button>
       </div>
       <div class="space-y-4 text-[16px]">
+        ${state.lastSyncError ? `
+        <div class="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-800 text-[14px]">
+          <div class="font-bold mb-1">最近一次同步錯誤訊息：</div>
+          <div class="mono break-all">${esc(state.lastSyncError)}</div>
+        </div>` : ''}
         <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-wrap items-center justify-between gap-3">
           <div>
             <div class="font-bold">閒置自動鎖屏（防離座偷窺）</div>
@@ -2234,13 +2260,16 @@
       const checkRes = await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`);
       const checkJson = await checkRes.json();
       if (!checkJson.files || checkJson.files.length === 0) {
-        const boundary = 'drivenote_backup_boundary';
-        const metadata = { name: snapName, parents: [backupFolderId], mimeType: 'application/json' };
-        const body = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${JSON.stringify(state.data, null, 2)}\r\n--${boundary}--`;
-        await driveFetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+        const cRes = await driveFetch('https://www.googleapis.com/drive/v3/files?fields=id', {
           method: 'POST',
-          headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
-          body
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: snapName, parents: [backupFolderId], mimeType: 'application/json' })
+        });
+        const cJson = await cRes.json();
+        await driveFetch(`https://www.googleapis.com/upload/drive/v3/files/${cJson.id}?uploadType=media`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(state.data, null, 2)
         });
       }
       safeSet(STORAGE_LAST_BACKUP_KEY, today);
