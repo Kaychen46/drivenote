@@ -90,9 +90,7 @@
       filter: blur(0);
     }
 
-    .mono {
-      font-family: 'JetBrains Mono', monospace;
-    }
+    .mono { font-family: 'JetBrains Mono', monospace; }
 
     .nav-item.active {
       background: linear-gradient(135deg, rgba(255, 122, 0, 0.14), rgba(166, 213, 247, 0.22));
@@ -106,9 +104,7 @@
       border-radius: 4px;
       transition: transform 0.12s ease;
     }
-    .heat-cell:hover {
-      transform: scale(1.25);
-    }
+    .heat-cell:hover { transform: scale(1.25); }
 
     .mic-recording {
       background-color: #DC2626 !important;
@@ -127,7 +123,7 @@
 </head>
 <body class="antialiased">
 
-  <!-- ==================== 1. PRIVATE LOGIN GATE (靜態登入殼) ==================== -->
+  <!-- ==================== 1. PRIVATE LOGIN GATE ==================== -->
   <section id="loginGate" class="min-h-screen flex items-center justify-center p-4 sm:p-8">
     <div class="glass-card w-full max-w-xl rounded-3xl p-7 sm:p-10 text-center">
       <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-5" style="background: linear-gradient(135deg, #FF7A00, #A6D5F7);">
@@ -186,7 +182,7 @@
 
         <!-- Global Search -->
         <div class="hidden md:flex flex-1 max-w-md mx-2">
-          <input id="globalSearchInput" type="search" placeholder="搜尋日記、靈感、學習、收件匣、#標籤..." class="w-full px-4 py-2 rounded-full bg-slate-100/90 border border-transparent focus:border-[#FF7A00] focus:bg-white outline-none text-[16px]">
+          <input id="globalSearchInput" type="search" placeholder="搜尋日記、靈感、書籍、網頁、類別、#標籤..." class="w-full px-4 py-2 rounded-full bg-slate-100/90 border border-transparent focus:border-[#FF7A00] focus:bg-white outline-none text-[16px]">
         </div>
 
         <!-- Action Toolbar -->
@@ -243,13 +239,17 @@
             <span>待完成與重複任務</span>
             <span id="badgeTodos" class="mono text-[13px] text-slate-500">0</span>
           </button>
-          <button type="button" data-tab="vault" class="nav-item w-full text-left px-4 py-2.5 rounded-2xl text-[17px] flex items-center justify-between">
-            <span>帳號提示區</span>
-            <span id="badgeVault" class="mono text-[13px] text-slate-500">0</span>
+          <button type="button" data-tab="bookmarks" class="nav-item w-full text-left px-4 py-2.5 rounded-2xl text-[17px] flex items-center justify-between">
+            <span>常用網頁收集箱</span>
+            <span id="badgeBookmarks" class="mono text-[13px] text-slate-500">0</span>
           </button>
           <button type="button" data-tab="snippets" class="nav-item w-full text-left px-4 py-2.5 rounded-2xl text-[17px] flex items-center justify-between">
             <span>常用片段與書籤</span>
             <span id="badgeSnippets" class="mono text-[13px] text-slate-500">0</span>
+          </button>
+          <button type="button" data-tab="vault" class="nav-item w-full text-left px-4 py-2.5 rounded-2xl text-[17px] flex items-center justify-between">
+            <span>帳號提示區</span>
+            <span id="badgeVault" class="mono text-[13px] text-slate-500">0</span>
           </button>
           <button type="button" data-tab="hub" class="nav-item w-full text-left px-4 py-2.5 rounded-2xl text-[17px] flex items-center justify-between">
             <span>專案聚合總覽</span>
@@ -271,7 +271,7 @@
       <main id="mainContent" class="lg:col-span-9 space-y-6 min-w-0"></main>
     </div>
 
-    <!-- Mobile Quick Capture Bar (with Voice-to-Text Mic!) -->
+    <!-- Mobile Quick Capture Bar -->
     <div class="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200 px-3 py-2.5">
       <div class="flex items-center gap-2 max-w-xl mx-auto">
         <select id="quickCaptureType" class="px-2.5 py-2 rounded-full bg-slate-100 text-[15px] font-medium outline-none">
@@ -299,22 +299,40 @@
 
 <script>
 (() => {
-  // ==================== CONFIG & STORAGE KEYS ====================
+  // ==================== CONFIG & CONSTANTS ====================
   const DEFAULT_GOOGLE_CLIENT_ID = '';
   const STORAGE_DATA_KEY = 'drivenote_data_v1';
   const STORAGE_CLIENT_ID_KEY = 'drivenote_google_client_id';
   const STORAGE_IDLE_KEY = 'drivenote_idle_lock_mins';
+  const STORAGE_LAST_BACKUP_KEY = 'drivenote_last_backup_date';
   const DRIVE_FOLDER_NAME = 'MyPersonalNotebook';
   const DRIVE_ATTACH_FOLDER = 'attachments';
   const DRIVE_DATA_FILE = 'notebook_data.json';
 
+  const CATEGORY_PRESETS = {
+    inbox: ['靈感摘錄', '文章連結', '待辦備忘', '工作資料', '其他'],
+    diary: ['日常生活', '工作研究', '學習反思', '健康運動', '人際旅行', '其他'],
+    ideas: ['產品點子', '內容創作', '研究構想', '工具優化', '生活靈感', '其他'],
+    learning: ['程式技術', '學術研究', 'AI 應用', '語言閱讀', '商業思維', '其他'],
+    books: ['自我成長', '商業理財', '科技與AI', '專業研究', '心理社科', '文學小說', '生活風格', '其他'],
+    todos: ['行動待辦', '待補資料', '工作研究', '個人生活', '財務帳務', '其他'],
+    bookmarks: ['AI 工具', '開發資源', '論文研究', '設計靈感', '生活消費', '學習平台', '其他'],
+    snippets: ['常用片段', 'AI Prompt', '指令代碼', '模板範本', '工具書籤', '其他'],
+    vault: ['雲端開發', '工作學術', '金融帳務', '社群娛樂', '網域訂閱', '其他']
+  };
+
+  const COLLECTION_LABELS = {
+    inbox: '收件匣', diaryEntries: '日記', ideas: 'Idea', learningLogs: '學習',
+    books: '閱讀書庫', todos: '待辦', bookmarks: '常用網頁', accountHints: '帳號提示', snippets: '常用片段'
+  };
+
   const state = {
-    mode: 'locked', // 'locked' | 'local' | 'google'
+    mode: 'locked',
     activeTab: 'dashboard',
     selectedHubTag: '',
     searchQuery: '',
     privacyBlur: false,
-    idleLockMinutes: 15, // 0 = off
+    idleLockMinutes: 15,
     accessToken: null,
     driveFileId: null,
     driveFolderId: null,
@@ -324,30 +342,31 @@
     data: null,
     pendingDiaryAttachment: null,
     bookFilterStatus: '全部',
-    bookFilterCategory: '全部',
-    editingBookId: '',
+    filters: {
+      inbox: '全部', diary: '全部', ideas: '全部', learning: '全部',
+      books: '全部', todos: '全部', bookmarks: '全部', snippets: '全部', vault: '全部'
+    },
+    pages: {
+      inbox: 1, diary: 1, ideas: 1, learning: 1,
+      books: 1, todos: 1, bookmarks: 1, snippets: 1, vault: 1, trash: 1
+    },
+    pageSize: 6,
+    editing: { tab: '', id: '' },
     pomo: {
       topicId: '',
-      mode: 'focus', // 'focus' (25m) | 'break' (5m)
+      mode: 'focus',
       secondsLeft: 25 * 60,
       running: false,
       timerId: null
     }
   };
 
-  // ==================== SAFE STORAGE & DATE HELPERS ====================
+  // ==================== SAFE STORAGE & HELPERS ====================
   function safeGet(key, fallback = null) {
-    try {
-      const raw = localStorage.getItem(key);
-      return raw ? JSON.parse(raw) : fallback;
-    } catch { return fallback; }
+    try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch { return fallback; }
   }
-  function safeSet(key, val) {
-    try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
-  }
-  function safeRemove(key) {
-    try { localStorage.removeItem(key); } catch {}
-  }
+  function safeSet(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch {} }
+  function safeRemove(key) { try { localStorage.removeItem(key); } catch {} }
 
   function todayStr(offsetDays = 0) {
     const d = new Date();
@@ -356,9 +375,8 @@
   }
   function nextWeekendStr() {
     const d = new Date();
-    const day = d.getDay(); // 0 Sun .. 6 Sat
-    const diff = day === 6 ? 7 : (6 - day);
-    d.setDate(d.getDate() + diff);
+    const day = d.getDay();
+    d.setDate(d.getDate() + (day === 6 ? 7 : (6 - day)));
     return d.toISOString().slice(0, 10);
   }
   function uid(prefix) {
@@ -379,15 +397,69 @@
     a.click();
     URL.revokeObjectURL(url);
   }
+  function getEditItem(tab, arr) {
+    return state.editing.tab === tab && state.editing.id ? arr.find(x => x.id === state.editing.id) || null : null;
+  }
+  function getCategoryOptions(tab, arr) {
+    return [...new Set([...(CATEGORY_PRESETS[tab] || ['其他']), ...arr.map(x => x.category).filter(Boolean)])];
+  }
+
+  // ==================== REUSABLE CATEGORY FILTER & PAGINATION UI ====================
+  function renderCategoryBar(tab, arr, extraHtml = '') {
+    const cats = getCategoryOptions(tab, arr);
+    const active = state.filters[tab] || '全部';
+    return `
+      <div class="glass-card rounded-3xl p-4 sm:p-5 space-y-3">
+        ${extraHtml}
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-[15px] font-semibold text-slate-500 mr-1">類別篩選：</span>
+          ${['全部', ...cats].map(c => `
+            <button type="button" data-cat-filter="${tab}:${esc(c)}" class="px-3.5 py-1 rounded-full text-[14px] font-semibold transition ${active === c ? 'bg-[#1D5B8C] text-white' : 'bg-slate-100 text-slate-700 hover:bg-sky-100'}">${esc(c)}</button>
+          `).join('')}
+        </div>
+      </div>`;
+  }
+
+  function paginateList(tab, list) {
+    const total = list.length;
+    const totalPages = Math.max(1, Math.ceil(total / state.pageSize));
+    let page = state.pages[tab] || 1;
+    if (page > totalPages) { page = totalPages; state.pages[tab] = page; }
+    if (page < 1) { page = 1; state.pages[tab] = 1; }
+    const start = (page - 1) * state.pageSize;
+    return {
+      items: list.slice(start, start + state.pageSize),
+      page, totalPages, total
+    };
+  }
+
+  function renderPaginationBar(tab, pg) {
+    if (pg.total === 0) return '';
+    return `
+      <div class="glass-card rounded-3xl px-5 py-3.5 flex flex-wrap items-center justify-between gap-3 text-[15px]">
+        <div class="flex items-center gap-2 text-slate-600">
+          <span>共 <strong class="mono text-[#1A1D21]">${pg.total}</strong> 筆・第 <strong class="mono text-[#FF7A00]">${pg.page}</strong> / ${pg.totalPages} 頁</span>
+          <select data-page-size-select="1" class="ml-2 px-3 py-1 rounded-full bg-slate-100 text-[14px] font-medium">
+            <option value="6" ${state.pageSize === 6 ? 'selected' : ''}>6 筆/頁</option>
+            <option value="10" ${state.pageSize === 10 ? 'selected' : ''}>10 筆/頁</option>
+            <option value="20" ${state.pageSize === 20 ? 'selected' : ''}>20 筆/頁</option>
+          </select>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" data-page-nav="${tab}:${pg.page - 1}" ${pg.page <= 1 ? 'disabled' : ''} class="btn-pill-soft px-4 py-1 text-[14px] disabled:opacity-40">← 上一頁</button>
+          <button type="button" data-page-nav="${tab}:${pg.page + 1}" ${pg.page >= pg.totalPages ? 'disabled' : ''} class="btn-pill-soft px-4 py-1 text-[14px] disabled:opacity-40">下一頁 →</button>
+        </div>
+      </div>`;
+  }
 
   // ==================== SEED DATA & MIGRATION ====================
   function createSeedData() {
     return {
-      version: 2,
+      version: 4,
       updatedAt: new Date().toISOString(),
       inbox: [
         {
-          id: 'in_1',
+          id: 'in_1', category: '文章連結',
           content: '看到一篇討論 Local-First Web App 離線同步架構的好文章，週末整理進學習筆記。',
           url: 'https://developers.google.com/workspace/drive/api/guides/manage-uploads',
           createdAt: todayStr(0), updatedAt: new Date().toISOString()
@@ -395,39 +467,33 @@
       ],
       diaryEntries: [
         {
-          id: 'd_1', date: todayStr(0), mood: 5,
+          id: 'd_1', date: todayStr(0), category: '工作研究', mood: 5,
           habits: ['閱讀', '運動', '寫筆記'],
-          content: '今天完成個人雲端記事本完整版架構，把收件匣、番茄鐘、回收桶跟語音快記全部整合進來了！',
+          content: '今天把個人雲端記事本升級到 v4，每個模組都加上類別分類、分頁、完整編輯功能與常用網頁收集箱！',
           tags: ['SideProject', '效率系統'], attachment: null, updatedAt: new Date().toISOString()
         },
         {
-          id: 'd_2', date: todayStr(-1), mood: 4,
+          id: 'd_2', date: todayStr(-1), category: '學習反思', mood: 4,
           habits: ['閱讀', '寫筆記'],
           content: '整理了一批論文資料，發現把待補文獻直接標成專案標籤，回頭找參考資料快很多。',
           tags: ['論文', '閱讀'], attachment: null, updatedAt: new Date().toISOString()
         },
         {
-          id: 'd_3', date: todayStr(-7), mood: 4,
+          id: 'd_3', date: todayStr(-7), category: '日常生活', mood: 4,
           habits: ['運動', '閱讀'],
           content: '一週前的紀錄：決定開始建立屬於自己的 Google Drive 個人知識系統，把零散筆記統一起來。',
           tags: ['SideProject'], attachment: null, updatedAt: new Date().toISOString()
-        },
-        {
-          id: 'd_4', date: todayStr(-30), mood: 3,
-          habits: ['閱讀'],
-          content: '一個月前的回顧：調整每日專注節奏，改成用 25 分鐘番茄鐘拆分大型研究任務。',
-          tags: ['論文'], attachment: null, updatedAt: new Date().toISOString()
         }
       ],
       ideas: [
         {
-          id: 'i_1', title: '為記事本加上每週 AI 自動復盤提示詞模板',
+          id: 'i_1', category: '產品點子', title: '為記事本加上每週 AI 自動復盤提示詞模板',
           notes: '整理完本週日記與學習紀錄後，一鍵複製貼給 AI 生成下週行動建議。',
           status: '評估中', priority: '高', tags: ['SideProject', 'AI'], linkedTodoId: 't_1',
           updatedAt: new Date().toISOString()
         },
         {
-          id: 'i_2', title: '建立個人閱讀金句與文獻卡片庫',
+          id: 'i_2', category: '研究構想', title: '建立個人閱讀金句與文獻卡片庫',
           notes: '每讀完一篇期刊論文，就在學習狀態記下核心論點與出處，方便論文引用。',
           status: '萌芽', priority: '中', tags: ['論文', '閱讀'], linkedTodoId: '',
           updatedAt: new Date().toISOString()
@@ -435,58 +501,15 @@
       ],
       learningLogs: [
         {
-          id: 'l_1', topic: 'Google Drive API v3 & OAuth 2.0 實作',
-          progressPct: 70, minutesSpent: 90, milestone: '完成 drive.file 權限與 JSON 上傳讀寫流程',
+          id: 'l_1', category: '程式技術', topic: 'Google Drive API v3 & OAuth 2.0 實作',
+          progressPct: 80, minutesSpent: 90, milestone: '完成 drive.file 權限與 JSON 上傳讀寫流程',
           resourceUrl: 'https://developers.google.com/workspace/drive/api/guides/api-specific-auth?hl=zh-tw',
           date: todayStr(0), tags: ['SideProject'], updatedAt: new Date().toISOString()
         },
         {
-          id: 'l_2', topic: '研究方法與文獻資料整理',
+          id: 'l_2', category: '學術研究', topic: '研究方法與文獻資料整理',
           progressPct: 55, minutesSpent: 60, milestone: '完成第三章核心文獻對照表初稿',
           resourceUrl: '', date: todayStr(-1), tags: ['論文', '閱讀'], updatedAt: new Date().toISOString()
-        }
-      ],
-      todos: [
-        {
-          id: 't_1', title: '在 Google Cloud Console 建立 OAuth Client ID',
-          category: '行動待辦', dueDate: todayStr(2), done: false, repeat: 'none',
-          sourceIdeaId: 'i_1', tags: ['SideProject'], updatedAt: new Date().toISOString()
-        },
-        {
-          id: 't_2', title: '每週日晚上進行 15 分鐘記事本週復盤與 JSON 備份',
-          category: '行動待辦', dueDate: todayStr(5), done: false, repeat: 'weekly',
-          sourceIdeaId: '', tags: ['效率系統'], updatedAt: new Date().toISOString()
-        },
-        {
-          id: 't_3', title: '補齊 2026 年度相關統計報表 PDF 資料',
-          category: '待補資料', dueDate: todayStr(4), done: false, repeat: 'none',
-          sourceIdeaId: '', tags: ['論文'], updatedAt: new Date().toISOString()
-        }
-      ],
-      accountHints: [
-        {
-          id: 'v_1', serviceName: 'GitHub（部署靜態網頁）', loginEmail: 'your-email@gmail.com',
-          authType: 'Passkey / 2FA', bitwardenFolder: '開發與雲端服務',
-          renewalDate: '', notes: 'Pages 來源倉庫與 Personal Access Token 均存於 Bitwarden。',
-          tags: ['SideProject'], updatedAt: new Date().toISOString()
-        },
-        {
-          id: 'v_2', serviceName: '個人網域續約提醒（範例）', loginEmail: 'your-email@gmail.com',
-          authType: 'Google SSO', bitwardenFolder: '網域與訂閱',
-          renewalDate: todayStr(10), notes: '到期前 14 天會自動出現在首頁到期雷達。',
-          tags: ['財務'], updatedAt: new Date().toISOString()
-        }
-      ],
-      snippets: [
-        {
-          id: 's_1', title: '每週 AI 復盤提示詞模板', category: '常用片段',
-          content: '請根據以下我本週的日記、學習紀錄與待辦清單，幫我整理：1. 本週最大亮點 2. 潛在瓶頸 3. 下週最值得優先推進的 3 個具體行動。',
-          url: '', tags: ['AI', '效率系統'], updatedAt: new Date().toISOString()
-        },
-        {
-          id: 's_2', title: 'Bitwarden Web Vault 密碼庫', category: '工具書籤',
-          content: '所有實際密碼、恢復碼與 API Secret 統一放這裡管理。',
-          url: 'https://vault.bitwarden.com/', tags: ['資安'], updatedAt: new Date().toISOString()
         }
       ],
       books: [
@@ -497,14 +520,45 @@
           takeaways: '1. 把想養成的習慣縮到兩分鐘內就能開始。\n2. 善用習慣堆疊，把新行為綁在既有日常之後。',
           quotes: '「你不會上升到目標的高度，你會跌落到系統的層次。」',
           tags: ['效率系統', '閱讀'], updatedAt: new Date().toISOString()
+        }
+      ],
+      todos: [
+        {
+          id: 't_1', title: '每週日晚上進行 15 分鐘記事本週復盤與 JSON 備份',
+          category: '行動待辦', dueDate: todayStr(5), done: false, repeat: 'weekly',
+          sourceIdeaId: '', tags: ['效率系統'], updatedAt: new Date().toISOString()
         },
         {
-          id: 'b_2', title: '超速學習（範例）', author: 'Scott Young', category: '專業研究',
-          status: '閱讀中', rating: 4, progressPct: 60, finishedDate: '',
-          oneLiner: '透過後設學習先畫出知識地圖，並用直接練習與提取練習加速內化。',
-          takeaways: '在開始新主題前先花 10% 時間拆解概念、事實與程序三類知識。',
-          quotes: '「直接做你想變擅長的那件事，不要只停留在被動閱讀。」',
-          tags: ['論文', '閱讀'], updatedAt: new Date().toISOString()
+          id: 't_2', title: '補齊 2026 年度相關統計報表 PDF 資料',
+          category: '待補資料', dueDate: todayStr(4), done: false, repeat: 'none',
+          sourceIdeaId: '', tags: ['論文'], updatedAt: new Date().toISOString()
+        }
+      ],
+      bookmarks: [
+        {
+          id: 'bm_1', title: 'Google Cloud Console', url: 'https://console.cloud.google.com/',
+          category: '開發資源', notes: '管理 DriveNote 的 OAuth 憑證與 API 設定。',
+          tags: ['SideProject'], updatedAt: new Date().toISOString()
+        },
+        {
+          id: 'bm_2', title: 'Bitwarden Web Vault', url: 'https://vault.bitwarden.com/',
+          category: 'AI 工具', notes: '個人所有帳號密碼與 2FA 安全庫入口。',
+          tags: ['資安'], updatedAt: new Date().toISOString()
+        }
+      ],
+      accountHints: [
+        {
+          id: 'v_1', category: '雲端開發', serviceName: 'GitHub（部署靜態網頁）', loginEmail: 'your-email@gmail.com',
+          authType: 'Passkey / 2FA', bitwardenFolder: '開發與雲端服務',
+          renewalDate: '', notes: 'Pages 來源倉庫與 Personal Access Token 均存於 Bitwarden。',
+          tags: ['SideProject'], updatedAt: new Date().toISOString()
+        }
+      ],
+      snippets: [
+        {
+          id: 's_1', title: '每週 AI 復盤提示詞模板', category: 'AI Prompt',
+          content: '請根據以下我本週的日記、學習紀錄與待辦清單，幫我整理：1. 本週最大亮點 2. 潛在瓶頸 3. 下週最值得優先推進的 3 個具體行動。',
+          url: '', tags: ['AI', '效率系統'], updatedAt: new Date().toISOString()
         }
       ],
       trash: []
@@ -514,16 +568,15 @@
   function ensureDataShape(d) {
     const seed = createSeedData();
     const out = Object.assign({}, seed, d || {});
-    ['inbox', 'diaryEntries', 'ideas', 'learningLogs', 'books', 'todos', 'accountHints', 'snippets', 'trash'].forEach(k => {
+    ['inbox', 'diaryEntries', 'ideas', 'learningLogs', 'books', 'todos', 'bookmarks', 'accountHints', 'snippets', 'trash'].forEach(k => {
       if (!Array.isArray(out[k])) out[k] = [];
     });
-    // Auto-prune trash older than 30 days
     const cutoff = Date.now() - 30 * 86400000;
     out.trash = out.trash.filter(item => new Date(item.deletedAt || Date.now()).getTime() >= cutoff);
     return out;
   }
 
-  // ==================== TOAST & CLIPBOARD ====================
+  // ==================== TOAST, CLIPBOARD, VOICE, IDLE LOCK ====================
   let toastTimer = null;
   function showToast(msg) {
     const el = document.getElementById('toast');
@@ -532,44 +585,27 @@
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => el.classList.add('hidden'), 2800);
   }
-
   function copyText(text, successMsg = '已複製到剪貼簿') {
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(() => showToast(successMsg)).catch(() => fallbackCopy(text, successMsg));
-    } else {
-      fallbackCopy(text, successMsg);
-    }
+    } else { fallbackCopy(text, successMsg); }
   }
   function fallbackCopy(text, successMsg) {
     const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
     try { document.execCommand('copy'); showToast(successMsg); } catch { showToast('請手動全選複製'); }
     document.body.removeChild(ta);
   }
 
-  // ==================== VOICE-TO-TEXT (Web Speech API) ====================
   let activeRecognition = null;
   function toggleVoiceInput(targetInputEl, btnEl) {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) {
-      showToast('目前瀏覽器不支援語音輸入，建議使用 Chrome 或 Edge');
-      return;
-    }
-    if (activeRecognition) {
-      activeRecognition.stop();
-      activeRecognition = null;
-      btnEl.classList.remove('mic-recording');
-      return;
-    }
+    if (!SR) { showToast('目前瀏覽器不支援語音輸入，建議使用 Chrome 或 Edge'); return; }
+    if (activeRecognition) { activeRecognition.stop(); activeRecognition = null; btnEl.classList.remove('mic-recording'); return; }
     try {
       const rec = new SR();
-      rec.lang = 'zh-TW';
-      rec.interimResults = false;
-      rec.maxAlternatives = 1;
+      rec.lang = 'zh-TW'; rec.interimResults = false; rec.maxAlternatives = 1;
       activeRecognition = rec;
       btnEl.classList.add('mic-recording');
       showToast('正在聆聽，請直接說話...');
@@ -582,29 +618,18 @@
         }
       };
       rec.onerror = () => showToast('語音辨識未成功，請確認麥克風權限');
-      rec.onend = () => {
-        activeRecognition = null;
-        btnEl.classList.remove('mic-recording');
-      };
+      rec.onend = () => { activeRecognition = null; btnEl.classList.remove('mic-recording'); };
       rec.start();
-    } catch {
-      btnEl.classList.remove('mic-recording');
-      showToast('無法啟動語音輸入');
-    }
+    } catch { btnEl.classList.remove('mic-recording'); showToast('無法啟動語音輸入'); }
   }
 
-  // ==================== IDLE AUTO-LOCK ====================
   let idleTimer = null;
   function resetIdleTimer() {
     clearTimeout(idleTimer);
     if (state.mode === 'locked' || !state.idleLockMinutes) return;
-    idleTimer = setTimeout(() => {
-      lockWorkspace('因閒置超過設定時間，已自動鎖定返回登入頁');
-    }, state.idleLockMinutes * 60 * 1000);
+    idleTimer = setTimeout(() => lockWorkspace('因閒置超過設定時間，已自動鎖定返回登入頁'), state.idleLockMinutes * 60 * 1000);
   }
-  ['mousemove', 'keydown', 'touchstart', 'click'].forEach(evt => {
-    window.addEventListener(evt, resetIdleTimer, { passive: true });
-  });
+  ['mousemove', 'keydown', 'touchstart', 'click'].forEach(evt => window.addEventListener(evt, resetIdleTimer, { passive: true }));
 
   function lockWorkspace(msg = '已鎖定並返回登入畫面') {
     clearTimeout(idleTimer);
@@ -629,21 +654,15 @@
     if (window.google?.accounts?.oauth2) return true;
     return new Promise((resolve) => {
       const s = document.createElement('script');
-      s.src = 'https://accounts.google.com/gsi/client';
-      s.async = true;
-      s.onload = () => resolve(true);
-      s.onerror = () => resolve(false);
+      s.src = 'https://accounts.google.com/gsi/client'; s.async = true;
+      s.onload = () => resolve(true); s.onerror = () => resolve(false);
       document.head.appendChild(s);
     });
   }
 
   async function startGoogleLogin() {
     const cid = (state.clientId || '').trim();
-    if (!cid) {
-      openOAuthConfigModal();
-      showToast('請先填入你的 Google OAuth Client ID');
-      return;
-    }
+    if (!cid) { openOAuthConfigModal(); showToast('請先填入你的 Google OAuth Client ID'); return; }
     const ok = await loadGsiScript();
     if (!ok || !window.google?.accounts?.oauth2) {
       showToast('目前環境無法載入 Google 登入服務，請於 GitHub Pages 或一般瀏覽器開啟');
@@ -654,10 +673,7 @@
         client_id: cid,
         scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email',
         callback: async (resp) => {
-          if (resp.error) {
-            showToast('Google 授權取消或未通過白名單驗證');
-            return;
-          }
+          if (resp.error) { showToast('Google 授權取消或未通過白名單驗證'); return; }
           if (resp.scope && !resp.scope.includes('drive.file')) {
             state.lastSyncError = '授權時未勾選 Google 雲端硬碟（drive.file）權限，請重新登入並勾選該項。';
             showToast(state.lastSyncError);
@@ -671,9 +687,7 @@
         }
       });
       tokenClient.requestAccessToken({ prompt: 'consent' });
-    } catch {
-      showToast('無法啟動 Google OAuth，請確認網址已加入授權來源');
-    }
+    } catch { showToast('無法啟動 Google OAuth，請確認網址已加入授權來源'); }
   }
 
   async function driveFetch(url, options = {}) {
@@ -681,12 +695,8 @@
     const res = await fetch(url, { ...options, headers });
     if (!res.ok) {
       let detail = '';
-      try {
-        const errJson = await res.json();
-        detail = errJson?.error?.message || JSON.stringify(errJson);
-      } catch {
-        try { detail = await res.text(); } catch {}
-      }
+      try { const j = await res.json(); detail = j?.error?.message || JSON.stringify(j); }
+      catch { try { detail = await res.text(); } catch {} }
       throw new Error(`HTTP ${res.status}: ${detail || res.statusText}`);
     }
     return res;
@@ -701,12 +711,9 @@
     const body = { name, mimeType: 'application/vnd.google-apps.folder' };
     if (parentId) body.parents = [parentId];
     const createRes = await driveFetch('https://www.googleapis.com/drive/v3/files', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
     });
-    const created = await createRes.json();
-    return created.id;
+    return (await createRes.json()).id;
   }
 
   async function uploadAttachmentToDrive(file) {
@@ -717,25 +724,40 @@
       const form = new FormData();
       form.append('metadata', new Blob([JSON.stringify({ name: `${todayStr(0)}_${file.name}`, parents: [state.driveAttachFolderId] })], { type: 'application/json' }));
       form.append('file', file);
-      const res = await driveFetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', {
-        method: 'POST',
-        body: form
-      });
+      const res = await driveFetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', { method: 'POST', body: form });
       return await res.json();
-    } catch {
-      return null;
-    }
+    } catch { return null; }
   }
 
   function mergeCollections(localArr = [], remoteArr = []) {
     const map = new Map();
     [...remoteArr, ...localArr].forEach(item => {
       const prev = map.get(item.id);
-      if (!prev || new Date(item.updatedAt || 0) >= new Date(prev.updatedAt || 0)) {
-        map.set(item.id, item);
-      }
+      if (!prev || new Date(item.updatedAt || 0) >= new Date(prev.updatedAt || 0)) map.set(item.id, item);
     });
     return [...map.values()];
+  }
+
+  async function ensureDailyDriveBackup() {
+    if (state.mode !== 'google' || !state.accessToken || !state.driveFolderId) return;
+    const today = todayStr(0);
+    if (safeGet(STORAGE_LAST_BACKUP_KEY, '') === today) return;
+    try {
+      const backupFolderId = await ensureDriveFolder('backups', state.driveFolderId);
+      const snapName = `${today}.json`;
+      const q = encodeURIComponent(`name='${snapName}' and '${backupFolderId}' in parents and trashed=false`);
+      const checkJson = await (await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`)).json();
+      if (!checkJson.files || checkJson.files.length === 0) {
+        const cJson = await (await driveFetch('https://www.googleapis.com/drive/v3/files?fields=id', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: snapName, parents: [backupFolderId], mimeType: 'application/json' })
+        })).json();
+        await driveFetch(`https://www.googleapis.com/upload/drive/v3/files/${cJson.id}?uploadType=media`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(state.data, null, 2)
+        });
+      }
+      safeSet(STORAGE_LAST_BACKUP_KEY, today);
+    } catch {}
   }
 
   async function syncWithGoogleDrive(initialPull = false) {
@@ -747,24 +769,22 @@
     try {
       if (!state.driveFolderId) state.driveFolderId = await ensureDriveFolder(DRIVE_FOLDER_NAME);
       const q = encodeURIComponent(`name='${DRIVE_DATA_FILE}' and '${state.driveFolderId}' in parents and trashed=false`);
-      const listRes = await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,modifiedTime)`);
-      const listJson = await listRes.json();
+      const listJson = await (await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,modifiedTime)`)).json();
 
       if (listJson.files?.length > 0) {
         state.driveFileId = listJson.files[0].id;
-        const fileRes = await driveFetch(`https://www.googleapis.com/drive/v3/files/${state.driveFileId}?alt=media`);
-        const remoteData = await fileRes.json();
+        const remoteData = await (await driveFetch(`https://www.googleapis.com/drive/v3/files/${state.driveFileId}?alt=media`)).json();
         if (initialPull && remoteData) {
           const r = ensureDataShape(remoteData);
           state.data = ensureDataShape({
-            version: 2,
-            updatedAt: new Date().toISOString(),
+            version: 4, updatedAt: new Date().toISOString(),
             inbox: mergeCollections(state.data.inbox, r.inbox),
             diaryEntries: mergeCollections(state.data.diaryEntries, r.diaryEntries),
             ideas: mergeCollections(state.data.ideas, r.ideas),
             learningLogs: mergeCollections(state.data.learningLogs, r.learningLogs),
             books: mergeCollections(state.data.books, r.books),
             todos: mergeCollections(state.data.todos, r.todos),
+            bookmarks: mergeCollections(state.data.bookmarks, r.bookmarks),
             accountHints: mergeCollections(state.data.accountHints, r.accountHints),
             snippets: mergeCollections(state.data.snippets, r.snippets),
             trash: mergeCollections(state.data.trash, r.trash)
@@ -772,22 +792,16 @@
           safeSet(STORAGE_DATA_KEY, state.data);
         }
         await driveFetch(`https://www.googleapis.com/upload/drive/v3/files/${state.driveFileId}?uploadType=media`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(state.data, null, 2)
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(state.data, null, 2)
         });
       } else {
-        const createRes = await driveFetch('https://www.googleapis.com/drive/v3/files?fields=id', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+        const created = await (await driveFetch('https://www.googleapis.com/drive/v3/files?fields=id', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: DRIVE_DATA_FILE, parents: [state.driveFolderId], mimeType: 'application/json' })
-        });
-        const created = await createRes.json();
+        })).json();
         state.driveFileId = created.id;
         await driveFetch(`https://www.googleapis.com/upload/drive/v3/files/${state.driveFileId}?uploadType=media`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(state.data, null, 2)
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(state.data, null, 2)
         });
       }
       state.lastSyncError = '';
@@ -797,7 +811,6 @@
       showToast('已與 Google Drive 完成同步');
     } catch (err) {
       state.lastSyncError = err?.message || '未知錯誤';
-      console.error('[DriveNote Sync Error]', state.lastSyncError);
       updateSyncBadge('同步失敗（點設定查看原因）', '#EF4444');
       showToast(`同步失敗：${state.lastSyncError.slice(0, 90)}`);
     }
@@ -815,24 +828,14 @@
     }
   }
 
-  // ==================== SOFT DELETE & TRASH ====================
-  const COLLECTION_LABELS = {
-    inbox: '收件匣', diaryEntries: '日記', ideas: 'Idea', learningLogs: '學習',
-    books: '閱讀書庫', todos: '待辦', accountHints: '帳號提示', snippets: '片段書籤'
-  };
-
+  // ==================== SOFT DELETE & POMODORO ====================
   function softDeleteItem(col, id) {
     const arr = state.data[col] || [];
     const target = arr.find(x => x.id === id);
     if (!target) return;
     state.data[col] = arr.filter(x => x.id !== id);
-    state.data.trash.unshift({
-      id: uid('tr'),
-      sourceCol: col,
-      item: target,
-      deletedAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    });
+    state.data.trash.unshift({ id: uid('tr'), sourceCol: col, item: target, deletedAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+    if (state.editing.id === id) state.editing = { tab: '', id: '' };
     persistData();
     showToast('已移入 30 天回收桶（可隨時還原）');
   }
@@ -847,28 +850,20 @@
     showToast(`已還原至「${COLLECTION_LABELS[tr.sourceCol] || tr.sourceCol}」`);
   }
 
-  // ==================== POMODORO ENGINE ====================
   function formatTime(secs) {
-    const m = Math.floor(secs / 60).toString().padStart(2, '0');
-    const s = (secs % 60).toString().padStart(2, '0');
-    return `${m}:${s}`;
+    return `${Math.floor(secs / 60).toString().padStart(2, '0')}:${(secs % 60).toString().padStart(2, '0')}`;
   }
-
   function creditPomodoroMinutes(mins) {
     if (mins <= 0) return;
     const topicId = state.pomo.topicId || state.data.learningLogs[0]?.id;
     const log = state.data.learningLogs.find(l => l.id === topicId);
     if (log) {
       log.minutesSpent = Number(log.minutesSpent || 0) + mins;
-      log.date = todayStr(0);
-      log.updatedAt = new Date().toISOString();
+      log.date = todayStr(0); log.updatedAt = new Date().toISOString();
       persistData();
       showToast(`已將 ${mins} 分鐘專注時間累加至「${log.topic}」`);
-    } else {
-      showToast('請先新增至少一個學習主題以累加時數');
-    }
+    } else { showToast('請先新增至少一個學習主題以累加時數'); }
   }
-
   function startPomodoro() {
     clearInterval(state.pomo.timerId);
     state.pomo.running = true;
@@ -878,17 +873,9 @@
         const readout = document.getElementById('pomoReadout');
         if (readout) readout.textContent = formatTime(state.pomo.secondsLeft);
       } else {
-        clearInterval(state.pomo.timerId);
-        state.pomo.running = false;
-        if (state.pomo.mode === 'focus') {
-          creditPomodoroMinutes(25);
-          state.pomo.mode = 'break';
-          state.pomo.secondsLeft = 5 * 60;
-        } else {
-          state.pomo.mode = 'focus';
-          state.pomo.secondsLeft = 25 * 60;
-          showToast('休息結束，準備開始下一個 25 分鐘專注！');
-        }
+        clearInterval(state.pomo.timerId); state.pomo.running = false;
+        if (state.pomo.mode === 'focus') { creditPomodoroMinutes(25); state.pomo.mode = 'break'; state.pomo.secondsLeft = 5 * 60; }
+        else { state.pomo.mode = 'focus'; state.pomo.secondsLeft = 25 * 60; showToast('休息結束，準備開始下一個 25 分鐘專注！'); }
         renderAll();
       }
     }, 1000);
@@ -898,17 +885,16 @@
   // ==================== DERIVED COMPUTATIONS ====================
   function getAllTags() {
     const counts = {};
-    [state.data.diaryEntries, state.data.ideas, state.data.learningLogs, state.data.books, state.data.todos, state.data.accountHints, state.data.snippets]
+    [state.data.diaryEntries, state.data.ideas, state.data.learningLogs, state.data.books, state.data.todos, state.data.bookmarks, state.data.accountHints, state.data.snippets]
       .forEach(arr => arr.forEach(item => (item.tags || []).forEach(t => { counts[t] = (counts[t] || 0) + 1; })));
     return Object.entries(counts).sort((a, b) => b[1] - a[1]);
   }
-
   function getUpcomingRadarItems() {
     const now = new Date(todayStr(0));
     const items = [];
     state.data.todos.filter(t => !t.done && t.dueDate).forEach(t => {
       const diff = Math.round((new Date(t.dueDate) - now) / 86400000);
-      if (diff <= 14) items.push({ type: t.category, title: t.title, date: t.dueDate, diff, tab: 'todos' });
+      if (diff <= 14) items.push({ type: t.category || '待辦', title: t.title, date: t.dueDate, diff, tab: 'todos' });
     });
     state.data.accountHints.filter(v => v.renewalDate).forEach(v => {
       const diff = Math.round((new Date(v.renewalDate) - now) / 86400000);
@@ -916,33 +902,26 @@
     });
     return items.sort((a, b) => a.diff - b.diff);
   }
-
   function getOnThisDayEntries() {
-    const today = todayStr(0);
-    const md = today.slice(5); // MM-DD
-    const d7 = todayStr(-7);
-    const d30 = todayStr(-30);
-    return state.data.diaryEntries.filter(e => {
-      if (e.date === today) return false;
-      return e.date.slice(5) === md || e.date === d7 || e.date === d30;
-    });
+    const today = todayStr(0), md = today.slice(5), d7 = todayStr(-7), d30 = todayStr(-30);
+    return state.data.diaryEntries.filter(e => e.date !== today && (e.date.slice(5) === md || e.date === d7 || e.date === d30));
   }
-
-  function matchesSearch(obj) {
+  function matchesFilter(tab, obj) {
+    const activeCat = state.filters[tab] || '全部';
+    if (activeCat !== '全部' && (obj.category || '其他') !== activeCat) return false;
     const q = state.searchQuery.trim().toLowerCase();
     if (!q) return true;
     const text = [
-      obj.title, obj.content, obj.notes, obj.topic, obj.milestone,
-      obj.author, obj.category, obj.oneLiner, obj.takeaways, obj.quotes, obj.serviceName, obj.loginEmail, obj.bitwardenFolder, (obj.tags || []).join(' ')
+      obj.title, obj.content, obj.notes, obj.topic, obj.milestone, obj.url,
+      obj.author, obj.category, obj.oneLiner, obj.takeaways, obj.quotes,
+      obj.serviceName, obj.loginEmail, obj.bitwardenFolder, (obj.tags || []).join(' ')
     ].filter(Boolean).join(' ').toLowerCase();
     return text.includes(q.replace(/^#/, ''));
   }
 
   // ==================== RENDERERS ====================
   function renderSidebar() {
-    document.querySelectorAll('.nav-item').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.tab === state.activeTab);
-    });
+    document.querySelectorAll('.nav-item').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === state.activeTab));
     document.getElementById('badgeDue').textContent = getUpcomingRadarItems().length;
     document.getElementById('badgeInbox').textContent = state.data.inbox.length;
     document.getElementById('badgeDiary').textContent = state.data.diaryEntries.length;
@@ -950,16 +929,14 @@
     document.getElementById('badgeLearning').textContent = state.data.learningLogs.length;
     document.getElementById('badgeBooks').textContent = state.data.books.length;
     document.getElementById('badgeTodos').textContent = state.data.todos.filter(t => !t.done).length;
-    document.getElementById('badgeVault').textContent = state.data.accountHints.length;
+    document.getElementById('badgeBookmarks').textContent = state.data.bookmarks.length;
     document.getElementById('badgeSnippets').textContent = state.data.snippets.length;
+    document.getElementById('badgeVault').textContent = state.data.accountHints.length;
     document.getElementById('badgeTrash').textContent = state.data.trash.length;
 
     const tags = getAllTags().slice(0, 10);
     document.getElementById('sidebarTags').innerHTML = tags.length
-      ? tags.map(([tag, cnt]) => `
-          <button type="button" data-hub-tag="${esc(tag)}" class="px-3 py-1 rounded-full text-[14px] bg-slate-100 hover:bg-orange-100 hover:text-[#B85200] text-slate-700 transition">
-            #${esc(tag)} <span class="mono text-[12px] opacity-70">${cnt}</span>
-          </button>`).join('')
+      ? tags.map(([tag, cnt]) => `<button type="button" data-hub-tag="${esc(tag)}" class="px-3 py-1 rounded-full text-[14px] bg-slate-100 hover:bg-orange-100 hover:text-[#B85200] text-slate-700 transition">#${esc(tag)} <span class="mono text-[12px] opacity-70">${cnt}</span></button>`).join('')
       : '<span class="text-[14px] text-slate-400 px-1">尚無標籤</span>';
   }
 
@@ -968,10 +945,8 @@
     state.data.diaryEntries.forEach(e => { entryByDate[e.date] = e; });
     const cells = [];
     for (let i = 97; i >= 0; i--) {
-      const ds = todayStr(-i);
-      const entry = entryByDate[ds];
-      let level = 0;
-      let tip = `${ds}：無紀錄`;
+      const ds = todayStr(-i), entry = entryByDate[ds];
+      let level = 0, tip = `${ds}：無紀錄`;
       if (entry) {
         const score = (Number(entry.mood) || 3) + (entry.habits?.length || 0);
         level = score >= 7 ? 4 : score >= 5 ? 3 : score >= 3 ? 2 : 1;
@@ -989,12 +964,9 @@
           </div>
           <div class="flex items-center gap-1.5 text-[13px] text-slate-500">
             <span>少</span>
-            <span class="w-3.5 h-3.5 rounded bg-[#EEF2F6]"></span>
-            <span class="w-3.5 h-3.5 rounded bg-[#FFD9B3]"></span>
-            <span class="w-3.5 h-3.5 rounded bg-[#FFB366]"></span>
-            <span class="w-3.5 h-3.5 rounded bg-[#FF7A00]"></span>
-            <span class="w-3.5 h-3.5 rounded bg-[#1D5B8C]"></span>
-            <span>滿格</span>
+            <span class="w-3.5 h-3.5 rounded bg-[#EEF2F6]"></span><span class="w-3.5 h-3.5 rounded bg-[#FFD9B3]"></span>
+            <span class="w-3.5 h-3.5 rounded bg-[#FFB366]"></span><span class="w-3.5 h-3.5 rounded bg-[#FF7A00]"></span>
+            <span class="w-3.5 h-3.5 rounded bg-[#1D5B8C]"></span><span>滿格</span>
           </div>
         </div>
         <div class="grid grid-flow-col grid-rows-7 gap-1.5 overflow-x-auto pb-2">${cells.join('')}</div>
@@ -1011,24 +983,11 @@
     const onThisDay = getOnThisDayEntries();
 
     return `
-      <!-- Weekly Digest KPI Strip -->
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div class="glass-card rounded-3xl p-5">
-          <div class="text-[15px] text-[#525B66]">本週日記篇數</div>
-          <div class="text-3xl font-bold text-[#1A1D21] mt-1 mono">${weekDiaries} <span class="text-[14px] font-normal text-slate-400">/ 總計 ${state.data.diaryEntries.length}</span></div>
-        </div>
-        <div class="glass-card rounded-3xl p-5">
-          <div class="text-[15px] text-[#525B66]">待完成 / 已完成</div>
-          <div class="text-3xl font-bold text-[#FF7A00] mt-1 mono">${activeTodos} <span class="text-[14px] font-normal text-slate-400">/ ${doneTodos}</span></div>
-        </div>
-        <div class="glass-card rounded-3xl p-5">
-          <div class="text-[15px] text-[#525B66]">本週學習分鐘</div>
-          <div class="text-3xl font-bold text-[#1D5B8C] mt-1 mono">${weekLearnMins}m</div>
-        </div>
-        <div class="glass-card rounded-3xl p-5">
-          <div class="text-[15px] text-[#525B66]">已完讀書籍</div>
-          <div class="text-3xl font-bold text-[#1A1D21] mt-1 mono">${state.data.books.filter(b => b.status === '已讀完').length} <span class="text-[14px] font-normal text-slate-400">/ 共 ${state.data.books.length} 本</span></div>
-        </div>
+        <div class="glass-card rounded-3xl p-5"><div class="text-[15px] text-[#525B66]">本週日記篇數</div><div class="text-3xl font-bold text-[#1A1D21] mt-1 mono">${weekDiaries} <span class="text-[14px] font-normal text-slate-400">/ ${state.data.diaryEntries.length}</span></div></div>
+        <div class="glass-card rounded-3xl p-5"><div class="text-[15px] text-[#525B66]">待完成 / 已完成</div><div class="text-3xl font-bold text-[#FF7A00] mt-1 mono">${activeTodos} <span class="text-[14px] font-normal text-slate-400">/ ${doneTodos}</span></div></div>
+        <div class="glass-card rounded-3xl p-5"><div class="text-[15px] text-[#525B66]">本週學習分鐘</div><div class="text-3xl font-bold text-[#1D5B8C] mt-1 mono">${weekLearnMins}m</div></div>
+        <div class="glass-card rounded-3xl p-5"><div class="text-[15px] text-[#525B66]">已完讀書籍</div><div class="text-3xl font-bold text-[#1A1D21] mt-1 mono">${state.data.books.filter(b => b.status === '已讀完').length} <span class="text-[14px] font-normal text-slate-400">/ ${state.data.books.length} 本</span></div></div>
       </div>
 
       ${radar.length ? `
@@ -1056,7 +1015,7 @@
               <div class="p-3.5 rounded-2xl bg-sky-50/50 border border-sky-100">
                 <div class="flex items-center gap-2 mb-1">
                   <span class="mono font-bold text-[15px] text-[#1D5B8C]">${esc(e.date)}</span>
-                  <span class="text-[13px] px-2 py-0.5 rounded-full bg-white text-slate-600">心情 ${e.mood}/5</span>
+                  <span class="text-[13px] px-2 py-0.5 rounded-full bg-white text-slate-600">${esc(e.category || '日常生活')}</span>
                 </div>
                 <p class="sensitive-content text-[16px] text-[#1A1D21]">${esc(e.content)}</p>
               </div>`).join('')}
@@ -1071,108 +1030,120 @@
           <button type="button" data-jump-tab="hub" class="text-[16px] font-semibold text-[#FF7A00] hover:underline">查看全部專案</button>
         </div>
         <div class="flex flex-wrap gap-2.5">
-          ${getAllTags().map(([tag, cnt]) => `
-            <button type="button" data-hub-tag="${esc(tag)}" class="px-4 py-2 rounded-full bg-white border border-slate-200 hover:border-[#FF7A00] text-[16px] font-medium transition">
-              #${esc(tag)} <span class="mono text-[13px] text-slate-400 ml-1">${cnt} 筆關聯</span>
-            </button>`).join('') || '<p class="text-slate-500">新增帶標籤的筆記後，這裡會自動聚合專案。</p>'}
+          ${getAllTags().map(([tag, cnt]) => `<button type="button" data-hub-tag="${esc(tag)}" class="px-4 py-2 rounded-full bg-white border border-slate-200 hover:border-[#FF7A00] text-[16px] font-medium transition">#${esc(tag)} <span class="mono text-[13px] text-slate-400 ml-1">${cnt} 筆</span></button>`).join('') || '<p class="text-slate-500">新增帶標籤的筆記後，這裡會自動聚合專案。</p>'}
         </div>
-      </div>
-    `;
+      </div>`;
   }
 
   function renderInbox() {
-    const items = state.data.inbox.filter(matchesSearch);
+    const editing = getEditItem('inbox', state.data.inbox);
+    const cats = getCategoryOptions('inbox', state.data.inbox);
+    const filtered = state.data.inbox.filter(x => matchesFilter('inbox', x));
+    const pg = paginateList('inbox', filtered);
     return `
       <div class="glass-card rounded-3xl p-6">
-        <h2 class="text-[24px] font-bold mb-2">暫存收件匣（Inbox）</h2>
-        <p class="text-[15px] text-[#525B66] mb-4">隨手丟進來的連結、點子或備忘先放這裡，有空再一鍵分流到五大模組。</p>
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <h2 class="text-[24px] font-bold">${editing ? '編輯收件匣項目' : '暫存收件匣（Inbox）'}</h2>
+          ${editing ? `<button type="button" data-cancel-edit="1" class="btn-pill-soft px-4 py-1 text-[14px]">取消編輯</button>` : ''}
+        </div>
         <form id="formInbox" class="space-y-3">
-          <textarea name="content" rows="2" required placeholder="貼上靈感、文章摘錄或待處理事項..." class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]"></textarea>
-          <div class="flex flex-wrap gap-3">
-            <input name="url" type="url" placeholder="相關網址（選填，https://...）" class="flex-1 min-w-[200px] px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
-            <button type="submit" class="btn-pill-orange px-7 py-2.5 text-[17px]">丟進收件匣</button>
+          <textarea name="content" rows="2" required placeholder="貼上靈感、文章摘錄或待處理事項..." class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">${esc(editing?.content || '')}</textarea>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <select name="category" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+              ${cats.map(c => `<option value="${esc(c)}" ${(editing?.category || cats[0]) === c ? 'selected' : ''}>類別：${esc(c)}</option>`).join('')}
+            </select>
+            <input name="url" type="url" value="${esc(editing?.url || '')}" placeholder="相關網址（選填）" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+            <button type="submit" class="btn-pill-orange px-6 py-2.5 text-[17px]">${editing ? '更新儲存' : '丟進收件匣'}</button>
           </div>
         </form>
       </div>
-
+      ${renderCategoryBar('inbox', state.data.inbox)}
       <div class="space-y-3.5">
-        ${items.map(x => `
+        ${pg.items.map(x => `
           <article class="glass-card rounded-3xl p-5">
-            <div class="flex items-start justify-between gap-2 mb-2">
-              <p class="text-[17px] text-[#1A1D21] whitespace-pre-line">${esc(x.content)}</p>
-              <span class="mono text-[13px] text-slate-400 shrink-0">${esc(x.createdAt || '')}</span>
-            </div>
-            ${x.url ? `<a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer" class="text-[15px] text-[#1D5B8C] underline break-all block mb-3">${esc(x.url)}</a>` : ''}
-            <div class="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-100">
-              <div class="flex flex-wrap gap-2">
-                <button type="button" data-triage="idea:${x.id}" class="btn-pill-soft px-3.5 py-1 text-[14px]">→ 轉為 Idea</button>
-                <button type="button" data-triage="todo:${x.id}" class="btn-pill-soft px-3.5 py-1 text-[14px]">→ 轉為待辦</button>
-                <button type="button" data-triage="diary:${x.id}" class="btn-pill-soft px-3.5 py-1 text-[14px]">→ 轉為日記</button>
-                <button type="button" data-triage="snippet:${x.id}" class="btn-pill-soft px-3.5 py-1 text-[14px]">→ 轉為書籤</button>
+            <div class="flex flex-wrap items-start justify-between gap-2 mb-2">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="px-2.5 py-0.5 rounded-full text-[13px] font-semibold bg-sky-50 text-[#1D5B8C]">${esc(x.category || '其他')}</span>
+                <span class="mono text-[13px] text-slate-400">${esc(x.createdAt || '')}</span>
               </div>
-              <button type="button" data-del="inbox:${x.id}" class="text-[14px] text-slate-400 hover:text-red-600">移至回收桶</button>
+              <div class="flex items-center gap-3 text-[14px]">
+                <button type="button" data-start-edit="inbox:${x.id}" class="font-semibold text-[#1D5B8C] hover:underline">編輯</button>
+                <button type="button" data-del="inbox:${x.id}" class="text-slate-400 hover:text-red-600">移至回收桶</button>
+              </div>
             </div>
-          </article>`).join('') || '<div class="glass-card rounded-3xl p-8 text-center text-slate-500">收件匣已清空！</div>'}
+            <p class="text-[17px] text-[#1A1D21] whitespace-pre-line mb-2">${esc(x.content)}</p>
+            ${x.url ? `<a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer" class="text-[15px] text-[#1D5B8C] underline break-all block mb-3">${esc(x.url)}</a>` : ''}
+            <div class="flex flex-wrap gap-2 pt-3 border-t border-slate-100">
+              <button type="button" data-triage="idea:${x.id}" class="btn-pill-soft px-3.5 py-1 text-[14px]">→ 轉為 Idea</button>
+              <button type="button" data-triage="todo:${x.id}" class="btn-pill-soft px-3.5 py-1 text-[14px]">→ 轉為待辦</button>
+              <button type="button" data-triage="diary:${x.id}" class="btn-pill-soft px-3.5 py-1 text-[14px]">→ 轉為日記</button>
+              <button type="button" data-triage="bookmark:${x.id}" class="btn-pill-soft px-3.5 py-1 text-[14px]">→ 轉為常用網頁</button>
+            </div>
+          </article>`).join('') || '<div class="glass-card rounded-3xl p-8 text-center text-slate-500">目前沒有符合條件的收件匣項目</div>'}
       </div>
-    `;
+      ${renderPaginationBar('inbox', pg)}`;
   }
 
   function renderDiary() {
-    const entries = state.data.diaryEntries.filter(matchesSearch).sort((a, b) => b.date.localeCompare(a.date));
+    const editing = getEditItem('diary', state.data.diaryEntries);
+    const cats = getCategoryOptions('diary', state.data.diaryEntries);
+    const filtered = state.data.diaryEntries.filter(e => matchesFilter('diary', e)).sort((a, b) => b.date.localeCompare(a.date));
+    const pg = paginateList('diary', filtered);
+    const editHabits = editing?.habits || ['寫筆記'];
     return `
       <div class="glass-card rounded-3xl p-6">
         <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
-          <h2 class="text-[24px] font-bold">新增每日日記</h2>
+          <h2 class="text-[24px] font-bold">${editing ? '編輯每日日記' : '新增每日日記'}</h2>
           <div class="flex flex-wrap gap-2">
+            ${editing ? `<button type="button" data-cancel-edit="1" class="btn-pill-soft px-4 py-1 text-[14px]">取消編輯</button>` : ''}
             <button id="btnDiaryVoice" type="button" class="btn-pill-soft px-3.5 py-1 text-[14px]">🎙 語音口述</button>
             <button type="button" data-tpl="review" class="btn-pill-soft px-3.5 py-1 text-[14px]">今日復盤模板</button>
             <button type="button" data-tpl="good3" class="btn-pill-soft px-3.5 py-1 text-[14px]">三件好事</button>
           </div>
         </div>
         <form id="formDiary" class="space-y-4">
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <input name="date" type="date" value="${todayStr(0)}" required class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
-            <select name="mood" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
-              <option value="5">心情 5/5 — 很充實</option>
-              <option value="4" selected>心情 4/5 — 順暢平穩</option>
-              <option value="3">心情 3/5 — 普通</option>
-              <option value="2">心情 2/5 — 稍微疲累</option>
-              <option value="1">心情 1/5 — 低潮需休息</option>
+          <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            <input name="date" type="date" value="${esc(editing?.date || todayStr(0))}" required class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+            <select name="category" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+              ${cats.map(c => `<option value="${esc(c)}" ${(editing?.category || cats[0]) === c ? 'selected' : ''}>類別：${esc(c)}</option>`).join('')}
             </select>
-            <input name="tags" type="text" placeholder="標籤（如：論文 SideProject）" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+            <select name="mood" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+              ${[5,4,3,2,1].map(m => `<option value="${m}" ${(editing?.mood ?? 4) === m ? 'selected' : ''}>心情 ${m}/5</option>`).join('')}
+            </select>
+            <input name="tags" type="text" value="${esc((editing?.tags || []).join(' '))}" placeholder="標籤（如：論文）" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
           </div>
           <div class="flex flex-wrap items-center gap-4 text-[16px] text-slate-700 px-1">
             <span class="font-semibold">今日習慣打卡：</span>
-            <label class="inline-flex items-center gap-1.5"><input type="checkbox" name="habit" value="閱讀" class="w-4 h-4 accent-[#FF7A00]"> 閱讀</label>
-            <label class="inline-flex items-center gap-1.5"><input type="checkbox" name="habit" value="運動" class="w-4 h-4 accent-[#FF7A00]"> 運動</label>
-            <label class="inline-flex items-center gap-1.5"><input type="checkbox" name="habit" value="寫筆記" checked class="w-4 h-4 accent-[#FF7A00]"> 寫筆記</label>
+            ${['閱讀', '運動', '寫筆記'].map(h => `<label class="inline-flex items-center gap-1.5"><input type="checkbox" name="habit" value="${h}" ${editHabits.includes(h) ? 'checked' : ''} class="w-4 h-4 accent-[#FF7A00]"> ${h}</label>`).join('')}
           </div>
-          <textarea id="diaryTextarea" name="content" rows="4" required placeholder="記錄今天發生的事情、想法或靈感..." class="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-[17px] outline-none focus:border-[#FF7A00]"></textarea>
+          <textarea id="diaryTextarea" name="content" rows="4" required placeholder="記錄今天發生的事情、想法或靈感..." class="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-[17px] outline-none focus:border-[#FF7A00]">${esc(editing?.content || '')}</textarea>
           <div class="flex flex-wrap items-center justify-between gap-3">
             <label class="btn-pill-soft px-4 py-2 text-[15px] cursor-pointer inline-flex items-center gap-2">
               <span>📎 附加圖片或檔案（直存 Drive）</span>
               <input id="diaryFileInput" type="file" accept="image/*,.pdf,.txt,.md" class="hidden">
             </label>
-            <span id="diaryFileName" class="text-[14px] text-slate-500">${state.pendingDiaryAttachment ? esc(state.pendingDiaryAttachment.name) : ''}</span>
-            <button type="submit" class="btn-pill-orange px-7 py-2.5 text-[17px] ml-auto">儲存日記</button>
+            <span id="diaryFileName" class="text-[14px] text-slate-500">${esc(state.pendingDiaryAttachment?.name || editing?.attachment?.name || '')}</span>
+            <button type="submit" class="btn-pill-orange px-7 py-2.5 text-[17px] ml-auto">${editing ? '更新日記' : '儲存日記'}</button>
           </div>
         </form>
       </div>
-
+      ${renderCategoryBar('diary', state.data.diaryEntries)}
       <div class="space-y-4">
-        ${entries.map(e => {
+        ${pg.items.map(e => {
           const dayLearning = state.data.learningLogs.filter(l => l.date === e.date);
           return `
           <article class="glass-card rounded-3xl p-6">
             <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-              <div class="flex flex-wrap items-center gap-2.5">
+              <div class="flex flex-wrap items-center gap-2">
                 <span class="mono font-bold text-[19px] text-[#1A1D21]">${esc(e.date)}</span>
-                <span class="px-3 py-0.5 rounded-full text-[14px] font-semibold bg-orange-50 text-[#B85200]">心情 ${e.mood}/5</span>
-                ${(e.habits || []).map(h => `<span class="px-2.5 py-0.5 rounded-full text-[13px] bg-sky-50 text-[#1D5B8C]">✓ ${esc(h)}</span>`).join('')}
+                <span class="px-2.5 py-0.5 rounded-full text-[13px] font-semibold bg-sky-50 text-[#1D5B8C]">${esc(e.category || '日常生活')}</span>
+                <span class="px-2.5 py-0.5 rounded-full text-[13px] font-semibold bg-orange-50 text-[#B85200]">心情 ${e.mood}/5</span>
+                ${(e.habits || []).map(h => `<span class="px-2.5 py-0.5 rounded-full text-[13px] bg-slate-100 text-slate-700">✓ ${esc(h)}</span>`).join('')}
               </div>
-              <div class="flex items-center gap-3">
-                <button type="button" data-md-diary="${e.id}" class="text-[14px] font-semibold text-[#1D5B8C] hover:underline">匯出 .md</button>
-                <button type="button" data-del="diaryEntries:${e.id}" class="text-[14px] text-slate-400 hover:text-red-600">移至回收桶</button>
+              <div class="flex items-center gap-3 text-[14px]">
+                <button type="button" data-start-edit="diary:${e.id}" class="font-semibold text-[#1D5B8C] hover:underline">編輯</button>
+                <button type="button" data-md-diary="${e.id}" class="font-semibold text-[#1D5B8C] hover:underline">匯出 .md</button>
+                <button type="button" data-del="diaryEntries:${e.id}" class="text-slate-400 hover:text-red-600">移至回收桶</button>
               </div>
             </div>
             <p class="sensitive-content whitespace-pre-line text-[18px] text-[#1A1D21] mb-3">${esc(e.content)}</p>
@@ -1184,44 +1155,48 @@
                   ${e.attachment.webViewLink ? `<a href="${esc(e.attachment.webViewLink)}" target="_blank" rel="noopener noreferrer" class="text-[#1D5B8C] underline">Drive 檢視 ↗</a>` : ''}
                 </div>
               </div>` : ''}
-            ${dayLearning.length ? `
-              <div class="mt-3 pt-3 border-t border-slate-100 text-[15px] text-[#1D5B8C]">
-                <span class="font-semibold">當日自動關聯學習：</span>
-                ${dayLearning.map(l => `${esc(l.topic)}（${l.progressPct}%・${l.minutesSpent}分鐘）`).join('｜')}
-              </div>` : ''}
-            <div class="flex flex-wrap gap-1.5 mt-3">
-              ${(e.tags || []).map(t => `<button type="button" data-hub-tag="${esc(t)}" class="text-[14px] px-2.5 py-0.5 rounded-full bg-slate-100 hover:bg-orange-100 text-slate-600">#${esc(t)}</button>`).join('')}
-            </div>
+            ${dayLearning.length ? `<div class="mt-3 pt-3 border-t border-slate-100 text-[15px] text-[#1D5B8C]"><span class="font-semibold">當日自動關聯學習：</span>${dayLearning.map(l => `${esc(l.topic)}（${l.progressPct}%・${l.minutesSpent}m）`).join('｜')}</div>` : ''}
+            <div class="flex flex-wrap gap-1.5 mt-3">${(e.tags || []).map(t => `<button type="button" data-hub-tag="${esc(t)}" class="text-[14px] px-2.5 py-0.5 rounded-full bg-slate-100 hover:bg-orange-100 text-slate-600">#${esc(t)}</button>`).join('')}</div>
           </article>`;
         }).join('') || '<div class="glass-card rounded-3xl p-8 text-center text-slate-500">目前沒有符合條件的日記紀錄</div>'}
       </div>
-    `;
+      ${renderPaginationBar('diary', pg)}`;
   }
 
   function renderIdeas() {
-    const ideas = state.data.ideas.filter(matchesSearch);
+    const editing = getEditItem('ideas', state.data.ideas);
+    const cats = getCategoryOptions('ideas', state.data.ideas);
+    const filtered = state.data.ideas.filter(i => matchesFilter('ideas', i));
+    const pg = paginateList('ideas', filtered);
     return `
       <div class="glass-card rounded-3xl p-6">
-        <h2 class="text-[24px] font-bold mb-4">捕捉新 Idea</h2>
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+          <h2 class="text-[24px] font-bold">${editing ? '編輯創意想法' : '捕捉新 Idea'}</h2>
+          ${editing ? `<button type="button" data-cancel-edit="1" class="btn-pill-soft px-4 py-1 text-[14px]">取消編輯</button>` : ''}
+        </div>
         <form id="formIdea" class="space-y-3.5">
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <input name="title" type="text" required placeholder="想法標題..." class="sm:col-span-2 px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+          <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            <input name="title" type="text" required value="${esc(editing?.title || '')}" placeholder="想法標題..." class="sm:col-span-2 px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+            <select name="category" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+              ${cats.map(c => `<option value="${esc(c)}" ${(editing?.category || cats[0]) === c ? 'selected' : ''}>類別：${esc(c)}</option>`).join('')}
+            </select>
             <select name="priority" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
-              <option value="高">優先度：高</option>
-              <option value="中" selected>優先度：中</option>
-              <option value="低">優先度：低</option>
+              ${['高','中','低'].map(p => `<option value="${p}" ${(editing?.priority || '中') === p ? 'selected' : ''}>優先度：${p}</option>`).join('')}
             </select>
           </div>
-          <textarea name="notes" rows="2" placeholder="補充細節、靈感來源或可行性..." class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]"></textarea>
-          <div class="flex flex-wrap items-center justify-between gap-3">
-            <input name="tags" type="text" placeholder="標籤（如：SideProject AI）" class="flex-1 min-w-[200px] px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
-            <button type="submit" class="btn-pill-orange px-7 py-2.5 text-[17px]">加入靈感庫</button>
+          <textarea name="notes" rows="2" placeholder="補充細節、靈感來源或可行性..." class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">${esc(editing?.notes || '')}</textarea>
+          <div class="flex flex-wrap items-center gap-3">
+            <select name="status" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+              ${['萌芽','評估中','已落地','封存'].map(st => `<option value="${st}" ${(editing?.status || '萌芽') === st ? 'selected' : ''}>狀態：${st}</option>`).join('')}
+            </select>
+            <input name="tags" type="text" value="${esc((editing?.tags || []).join(' '))}" placeholder="標籤（如：SideProject AI）" class="flex-1 min-w-[180px] px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+            <button type="submit" class="btn-pill-orange px-7 py-2.5 text-[17px]">${editing ? '更新想法' : '加入靈感庫'}</button>
           </div>
         </form>
       </div>
-
+      ${renderCategoryBar('ideas', state.data.ideas)}
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        ${ideas.map(i => `
+        ${pg.items.map(i => `
           <article class="glass-card rounded-3xl p-6 flex flex-col justify-between gap-4">
             <div>
               <div class="flex items-start justify-between gap-2 mb-2">
@@ -1230,26 +1205,32 @@
               </div>
               <p class="text-[16px] text-[#525B66] mb-3">${esc(i.notes || '無補充說明')}</p>
               <div class="flex flex-wrap gap-1.5">
-                <span class="text-[13px] px-2.5 py-0.5 rounded-full bg-sky-50 text-[#1D5B8C]">優先：${esc(i.priority)}</span>
+                <span class="text-[13px] px-2.5 py-0.5 rounded-full bg-sky-50 text-[#1D5B8C] font-semibold">${esc(i.category || '產品點子')}</span>
+                <span class="text-[13px] px-2.5 py-0.5 rounded-full bg-orange-50 text-[#B85200]">優先：${esc(i.priority)}</span>
                 ${(i.tags || []).map(t => `<button type="button" data-hub-tag="${esc(t)}" class="text-[13px] px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600">#${esc(t)}</button>`).join('')}
               </div>
             </div>
-            <div class="flex items-center justify-between pt-3 border-t border-slate-100">
+            <div class="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-100">
               ${i.linkedTodoId
-                ? `<button type="button" data-jump-tab="todos" class="text-[14px] font-semibold text-[#1D5B8C] hover:underline">已關聯至待辦清單 →</button>`
-                : `<button type="button" data-promote-idea="${i.id}" class="btn-pill-soft px-4 py-1.5 text-[14px]">一鍵轉為待辦</button>`}
-              <button type="button" data-del="ideas:${i.id}" class="text-[14px] text-slate-400 hover:text-red-600">移至回收桶</button>
+                ? `<button type="button" data-jump-tab="todos" class="text-[14px] font-semibold text-[#1D5B8C] hover:underline">已關聯至待辦 →</button>`
+                : `<button type="button" data-promote-idea="${i.id}" class="btn-pill-soft px-4 py-1 text-[14px]">一鍵轉為待辦</button>`}
+              <div class="flex items-center gap-3 text-[14px]">
+                <button type="button" data-start-edit="ideas:${i.id}" class="font-semibold text-[#1D5B8C] hover:underline">編輯</button>
+                <button type="button" data-del="ideas:${i.id}" class="text-slate-400 hover:text-red-600">移至回收桶</button>
+              </div>
             </div>
           </article>`).join('') || '<div class="md:col-span-2 glass-card rounded-3xl p-8 text-center text-slate-500">尚無符合條件的靈感</div>'}
       </div>
-    `;
+      ${renderPaginationBar('ideas', pg)}`;
   }
 
   function renderLearning() {
-    const logs = state.data.learningLogs.filter(matchesSearch);
+    const editing = getEditItem('learning', state.data.learningLogs);
+    const cats = getCategoryOptions('learning', state.data.learningLogs);
+    const filtered = state.data.learningLogs.filter(l => matchesFilter('learning', l));
+    const pg = paginateList('learning', filtered);
     if (!state.pomo.topicId && state.data.learningLogs.length) state.pomo.topicId = state.data.learningLogs[0].id;
     return `
-      <!-- Built-in Pomodoro Focus Timer -->
       <div class="glass-card rounded-3xl p-6 border-l-4 border-l-[#FF7A00]">
         <div class="flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -1263,82 +1244,86 @@
             </div>
           </div>
           <div class="flex flex-wrap items-center gap-3">
-            <span id="pomoReadout" class="mono text-4xl font-bold text-[#1A1D21] tracking-tight">${formatTime(state.pomo.secondsLeft)}</span>
+            <span id="pomoReadout" class="mono text-4xl font-bold text-[#1A1D21]">${formatTime(state.pomo.secondsLeft)}</span>
             <button id="btnPomoToggle" type="button" class="btn-pill-orange px-5 py-2 text-[16px]">${state.pomo.running ? '暫停' : '開始專注'}</button>
             <button id="btnPomoReset" type="button" class="btn-pill-soft px-4 py-2 text-[15px]">重設</button>
-            <button id="btnPomoLogNow" type="button" class="btn-pill-soft px-4 py-2 text-[15px]" title="立刻把 25 分鐘計入此主題">+25m 打卡</button>
+            <button id="btnPomoLogNow" type="button" class="btn-pill-soft px-4 py-2 text-[15px]">+25m 打卡</button>
           </div>
         </div>
       </div>
 
       <div class="glass-card rounded-3xl p-6">
-        <h2 class="text-[24px] font-bold mb-4">記錄學習狀態</h2>
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+          <h2 class="text-[24px] font-bold">${editing ? '編輯學習狀態' : '記錄學習狀態'}</h2>
+          ${editing ? `<button type="button" data-cancel-edit="1" class="btn-pill-soft px-4 py-1 text-[14px]">取消編輯</button>` : ''}
+        </div>
         <form id="formLearning" class="space-y-3.5">
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <input name="topic" type="text" required placeholder="學習主題（如：FastAPI / 統計分析）" class="sm:col-span-2 px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
-            <input name="minutesSpent" type="number" min="0" value="45" placeholder="投入分鐘" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+          <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            <input name="topic" type="text" required value="${esc(editing?.topic || '')}" placeholder="學習主題..." class="sm:col-span-2 px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+            <select name="category" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+              ${cats.map(c => `<option value="${esc(c)}" ${(editing?.category || cats[0]) === c ? 'selected' : ''}>類別：${esc(c)}</option>`).join('')}
+            </select>
+            <input name="minutesSpent" type="number" min="0" value="${editing?.minutesSpent ?? 45}" placeholder="投入分鐘" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <input name="milestone" type="text" placeholder="目前進度或重點筆記..." class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
-            <input name="tags" type="text" placeholder="標籤（如：論文 SideProject）" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+            <input name="milestone" type="text" value="${esc(editing?.milestone || '')}" placeholder="目前進度或重點筆記..." class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+            <input name="tags" type="text" value="${esc((editing?.tags || []).join(' '))}" placeholder="標籤（如：論文 SideProject）" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
           </div>
           <div class="flex flex-wrap items-center justify-between gap-4">
             <label class="flex items-center gap-3 flex-1 min-w-[220px] text-[16px]">
               <span class="font-semibold">完成度：</span>
-              <input id="learnRange" name="progressPct" type="range" min="0" max="100" value="30" class="flex-1 accent-[#FF7A00]">
-              <span id="learnRangeVal" class="mono font-bold text-[#FF7A00] w-12">30%</span>
+              <input id="learnRange" name="progressPct" type="range" min="0" max="100" value="${editing?.progressPct ?? 30}" class="flex-1 accent-[#FF7A00]">
+              <span id="learnRangeVal" class="mono font-bold text-[#FF7A00] w-12">${editing?.progressPct ?? 30}%</span>
             </label>
-            <button type="submit" class="btn-pill-orange px-7 py-2.5 text-[17px]">新增學習紀錄</button>
+            <button type="submit" class="btn-pill-orange px-7 py-2.5 text-[17px]">${editing ? '更新學習紀錄' : '新增學習紀錄'}</button>
           </div>
         </form>
       </div>
-
+      ${renderCategoryBar('learning', state.data.learningLogs)}
       <div class="space-y-4">
-        ${logs.map(l => `
+        ${pg.items.map(l => `
           <article class="glass-card rounded-3xl p-6">
             <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
-              <h3 class="text-[20px] font-bold">${esc(l.topic)}</h3>
-              <div class="flex items-center gap-3">
-                <span class="mono text-[14px] text-slate-500">${esc(l.date)}・${l.minutesSpent} 分鐘</span>
-                <button type="button" data-md-learn="${l.id}" class="text-[14px] font-semibold text-[#1D5B8C] hover:underline">匯出 .md</button>
-                <button type="button" data-del="learningLogs:${l.id}" class="text-[14px] text-slate-400 hover:text-red-600">移至回收桶</button>
+              <div class="flex flex-wrap items-center gap-2">
+                <h3 class="text-[20px] font-bold">${esc(l.topic)}</h3>
+                <span class="px-2.5 py-0.5 rounded-full text-[13px] font-semibold bg-sky-50 text-[#1D5B8C]">${esc(l.category || '程式技術')}</span>
+              </div>
+              <div class="flex items-center gap-3 text-[14px]">
+                <span class="mono text-slate-500">${esc(l.date)}・${l.minutesSpent}m</span>
+                <button type="button" data-start-edit="learning:${l.id}" class="font-semibold text-[#1D5B8C] hover:underline">編輯</button>
+                <button type="button" data-md-learn="${l.id}" class="font-semibold text-[#1D5B8C] hover:underline">匯出 .md</button>
+                <button type="button" data-del="learningLogs:${l.id}" class="text-slate-400 hover:text-red-600">移至回收桶</button>
               </div>
             </div>
             <p class="text-[16px] text-[#525B66] mb-3">${esc(l.milestone || '持續推進中')}</p>
             <div class="flex items-center gap-3 mb-3">
-              <div class="flex-1 h-3 rounded-full bg-slate-100 overflow-hidden">
-                <div class="h-full rounded-full" style="width:${l.progressPct}%; background: linear-gradient(90deg, #FF7A00, #A6D5F7);"></div>
-              </div>
+              <div class="flex-1 h-3 rounded-full bg-slate-100 overflow-hidden"><div class="h-full rounded-full" style="width:${l.progressPct}%; background: linear-gradient(90deg, #FF7A00, #A6D5F7);"></div></div>
               <span class="mono font-bold text-[15px] text-[#1D5B8C] w-12 text-right">${l.progressPct}%</span>
               <button type="button" data-bump-learn="${l.id}" class="btn-pill-soft px-3 py-1 text-[13px]">+10%</button>
             </div>
-            <div class="flex flex-wrap gap-1.5">
-              ${(l.tags || []).map(t => `<button type="button" data-hub-tag="${esc(t)}" class="text-[13px] px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600">#${esc(t)}</button>`).join('')}
-            </div>
-          </article>`).join('') || '<div class="glass-card rounded-3xl p-8 text-center text-slate-500">尚無學習紀錄</div>'}
+            <div class="flex flex-wrap gap-1.5">${(l.tags || []).map(t => `<button type="button" data-hub-tag="${esc(t)}" class="text-[13px] px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600">#${esc(t)}</button>`).join('')}</div>
+          </article>`).join('') || '<div class="glass-card rounded-3xl p-8 text-center text-slate-500">尚無符合條件的學習紀錄</div>'}
       </div>
-    `;
+      ${renderPaginationBar('learning', pg)}`;
   }
 
-  const BOOK_CATEGORIES = ['自我成長', '商業理財', '科技與AI', '專業研究', '心理社科', '文學小說', '生活風格', '其他'];
-
   function renderBooks() {
-    const editing = state.editingBookId ? state.data.books.find(b => b.id === state.editingBookId) : null;
-    const allCats = [...new Set([...BOOK_CATEGORIES, ...state.data.books.map(b => b.category).filter(Boolean)])];
-    const books = state.data.books.filter(b => {
-      if (!matchesSearch(b)) return false;
-      if (state.bookFilterStatus !== '全部' && b.status !== state.bookFilterStatus) return false;
-      if (state.bookFilterCategory !== '全部' && b.category !== state.bookFilterCategory) return false;
-      return true;
-    });
+    const editing = getEditItem('books', state.data.books);
+    const cats = getCategoryOptions('books', state.data.books);
+    const filtered = state.data.books.filter(b => matchesFilter('books', b) && (state.bookFilterStatus === '全部' || b.status === state.bookFilterStatus));
     const statusOrder = { '閱讀中': 0, '已讀完': 1, '想讀': 2 };
-    books.sort((a, b) => (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9));
-
+    filtered.sort((a, b) => (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9));
+    const pg = paginateList('books', filtered);
+    const statusFilterHtml = `
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-[15px] font-semibold text-slate-500 mr-1">閱讀狀態：</span>
+        ${['全部', '閱讀中', '已讀完', '想讀'].map(st => `<button type="button" data-book-status="${st}" class="px-3.5 py-1 rounded-full text-[14px] font-semibold transition ${state.bookFilterStatus === st ? 'bg-[#FF7A00] text-white' : 'bg-slate-100 text-slate-700 hover:bg-orange-100'}">${st}</button>`).join('')}
+      </div>`;
     return `
       <div class="glass-card rounded-3xl p-6">
         <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
           <h2 class="text-[24px] font-bold">${editing ? '編輯書籍與重點心得' : '新增閱讀書籍與心得'}</h2>
-          ${editing ? `<button id="btnCancelEditBook" type="button" class="btn-pill-soft px-4 py-1 text-[14px]">取消編輯</button>` : ''}
+          ${editing ? `<button type="button" data-cancel-edit="1" class="btn-pill-soft px-4 py-1 text-[14px]">取消編輯</button>` : ''}
         </div>
         <form id="formBook" class="space-y-3.5">
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -1347,17 +1332,15 @@
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <select name="category" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
-              ${allCats.map(c => `<option value="${esc(c)}" ${(editing?.category || '自我成長') === c ? 'selected' : ''}>分類：${esc(c)}</option>`).join('')}
+              ${cats.map(c => `<option value="${esc(c)}" ${(editing?.category || cats[0]) === c ? 'selected' : ''}>分類：${esc(c)}</option>`).join('')}
             </select>
             <select name="status" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
-              <option value="閱讀中" ${(editing?.status || '閱讀中') === '閱讀中' ? 'selected' : ''}>閱讀中</option>
-              <option value="已讀完" ${editing?.status === '已讀完' ? 'selected' : ''}>已讀完</option>
-              <option value="想讀" ${editing?.status === '想讀' ? 'selected' : ''}>想讀</option>
+              ${['閱讀中','已讀完','想讀'].map(st => `<option value="${st}" ${(editing?.status || '閱讀中') === st ? 'selected' : ''}>${st}</option>`).join('')}
             </select>
             <select name="rating" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
               ${[5,4,3,2,1].map(r => `<option value="${r}" ${(editing?.rating ?? 5) === r ? 'selected' : ''}>${'★'.repeat(r)} (${r}星)</option>`).join('')}
             </select>
-            <input name="finishedDate" type="date" value="${esc(editing?.finishedDate || '')}" title="完讀日期（選填）" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+            <input name="finishedDate" type="date" value="${esc(editing?.finishedDate || '')}" title="完讀日期" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
             <label class="flex items-center gap-3 text-[16px]">
@@ -1367,33 +1350,15 @@
             </label>
             <input name="tags" type="text" value="${esc((editing?.tags || []).join(' '))}" placeholder="標籤（如：論文 效率系統）" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
           </div>
-          <input name="oneLiner" type="text" value="${esc(editing?.oneLiner || '')}" placeholder="一句話核心收穫（這本書帶給你最大的啟發）..." class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
-          <textarea name="takeaways" rows="3" placeholder="重點心得與行動轉化（條列重點、觀點改變或想實踐的方法）..." class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">${esc(editing?.takeaways || '')}</textarea>
+          <input name="oneLiner" type="text" value="${esc(editing?.oneLiner || '')}" placeholder="一句話核心收穫..." class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+          <textarea name="takeaways" rows="3" placeholder="重點心得與行動轉化..." class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">${esc(editing?.takeaways || '')}</textarea>
           <textarea name="quotes" rows="2" placeholder="書中金句與頁碼摘錄（選填）..." class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">${esc(editing?.quotes || '')}</textarea>
-          <div class="flex justify-end">
-            <button type="submit" class="btn-pill-orange px-7 py-2.5 text-[17px]">${editing ? '更新書籍心得' : '收入閱讀書庫'}</button>
-          </div>
+          <div class="flex justify-end"><button type="submit" class="btn-pill-orange px-7 py-2.5 text-[17px]">${editing ? '更新書籍心得' : '收入閱讀書庫'}</button></div>
         </form>
       </div>
-
-      <!-- Status & Category Filter Bar -->
-      <div class="glass-card rounded-3xl p-5 space-y-3">
-        <div class="flex flex-wrap items-center gap-2">
-          <span class="text-[15px] font-semibold text-slate-500 mr-1">狀態：</span>
-          ${['全部', '閱讀中', '已讀完', '想讀'].map(st => `
-            <button type="button" data-book-status="${st}" class="px-3.5 py-1 rounded-full text-[15px] font-semibold transition ${state.bookFilterStatus === st ? 'bg-[#FF7A00] text-white' : 'bg-slate-100 text-slate-700 hover:bg-orange-100'}">${st}</button>
-          `).join('')}
-        </div>
-        <div class="flex flex-wrap items-center gap-2">
-          <span class="text-[15px] font-semibold text-slate-500 mr-1">分類：</span>
-          ${['全部', ...allCats].map(cat => `
-            <button type="button" data-book-cat="${esc(cat)}" class="px-3.5 py-1 rounded-full text-[14px] font-semibold transition ${state.bookFilterCategory === cat ? 'bg-[#1D5B8C] text-white' : 'bg-slate-100 text-slate-700 hover:bg-sky-100'}">${esc(cat)}</button>
-          `).join('')}
-        </div>
-      </div>
-
+      ${renderCategoryBar('books', state.data.books, statusFilterHtml)}
       <div class="space-y-4">
-        ${books.map(b => `
+        ${pg.items.map(b => `
           <article class="glass-card rounded-3xl p-6">
             <div class="flex flex-wrap items-start justify-between gap-2 mb-2">
               <div>
@@ -1409,29 +1374,22 @@
                 </div>
               </div>
               <div class="flex items-center gap-3 text-[14px]">
-                <button type="button" data-edit-book="${b.id}" class="font-semibold text-[#1D5B8C] hover:underline">編輯</button>
+                <button type="button" data-start-edit="books:${b.id}" class="font-semibold text-[#1D5B8C] hover:underline">編輯</button>
                 <button type="button" data-md-book="${b.id}" class="font-semibold text-[#1D5B8C] hover:underline">匯出 .md</button>
                 <button type="button" data-del="books:${b.id}" class="text-slate-400 hover:text-red-600">移至回收桶</button>
               </div>
             </div>
-
             ${b.status !== '想讀' ? `
               <div class="flex items-center gap-3 my-3">
-                <div class="flex-1 h-2.5 rounded-full bg-slate-100 overflow-hidden">
-                  <div class="h-full rounded-full" style="width:${b.progressPct || 0}%; background: linear-gradient(90deg, #FF7A00, #A6D5F7);"></div>
-                </div>
+                <div class="flex-1 h-2.5 rounded-full bg-slate-100 overflow-hidden"><div class="h-full rounded-full" style="width:${b.progressPct || 0}%; background: linear-gradient(90deg, #FF7A00, #A6D5F7);"></div></div>
                 <span class="mono font-bold text-[14px] text-[#1D5B8C] w-11 text-right">${b.progressPct || 0}%</span>
                 ${(b.progressPct || 0) < 100 ? `<button type="button" data-bump-book="${b.id}" class="btn-pill-soft px-3 py-0.5 text-[13px]">+20%</button>` : ''}
               </div>` : ''}
-
             ${b.oneLiner ? `<p class="text-[17px] font-semibold text-[#B85200] bg-orange-50/70 px-4 py-2.5 rounded-2xl mb-3">「${esc(b.oneLiner)}」</p>` : ''}
             ${b.takeaways ? `<div class="text-[16px] text-[#1A1D21] whitespace-pre-line mb-3"><strong class="text-slate-600">重點心得：</strong>\n${esc(b.takeaways)}</div>` : ''}
             ${b.quotes ? `<blockquote class="border-l-4 border-sky-300 pl-3.5 text-[15px] text-[#525B66] whitespace-pre-line mb-3">${esc(b.quotes)}</blockquote>` : ''}
-
             <div class="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
-              <div class="flex flex-wrap gap-1.5">
-                ${(b.tags || []).map(t => `<button type="button" data-hub-tag="${esc(t)}" class="text-[13px] px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600">#${esc(t)}</button>`).join('')}
-              </div>
+              <div class="flex flex-wrap gap-1.5">${(b.tags || []).map(t => `<button type="button" data-hub-tag="${esc(t)}" class="text-[13px] px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600">#${esc(t)}</button>`).join('')}</div>
               <div class="flex flex-wrap gap-2">
                 <button type="button" data-book-to-todo="${b.id}" class="btn-pill-soft px-3.5 py-1 text-[13px]">心得轉待辦</button>
                 <button type="button" data-book-to-snippet="${b.id}" class="btn-pill-soft px-3.5 py-1 text-[13px]">金句存片段</button>
@@ -1439,105 +1397,224 @@
             </div>
           </article>`).join('') || '<div class="glass-card rounded-3xl p-8 text-center text-slate-500">這個分類或狀態下目前沒有書籍紀錄</div>'}
       </div>
-    `;
+      ${renderPaginationBar('books', pg)}`;
   }
 
   function renderTodos() {
-    const todos = state.data.todos.filter(matchesSearch).sort((a, b) => Number(a.done) - Number(b.done) || (a.dueDate || '9999').localeCompare(b.dueDate || '9999'));
+    const editing = getEditItem('todos', state.data.todos);
+    const cats = getCategoryOptions('todos', state.data.todos);
+    const filtered = state.data.todos.filter(t => matchesFilter('todos', t)).sort((a, b) => Number(a.done) - Number(b.done) || (a.dueDate || '9999').localeCompare(b.dueDate || '9999'));
+    const pg = paginateList('todos', filtered);
     const repeatLabels = { none: '單次', daily: '每日重複', weekly: '每週重複', monthly: '每月重複' };
     return `
       <div class="glass-card rounded-3xl p-6">
-        <h2 class="text-[24px] font-bold mb-4">新增待完成資料與任務</h2>
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+          <h2 class="text-[24px] font-bold">${editing ? '編輯待辦與任務' : '新增待完成資料與任務'}</h2>
+          ${editing ? `<button type="button" data-cancel-edit="1" class="btn-pill-soft px-4 py-1 text-[14px]">取消編輯</button>` : ''}
+        </div>
         <form id="formTodo" class="space-y-3.5">
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <input name="title" type="text" required placeholder="待辦事項或待整理資料..." class="sm:col-span-2 px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+            <input name="title" type="text" required value="${esc(editing?.title || '')}" placeholder="待辦事項或待整理資料..." class="sm:col-span-2 px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
             <select name="category" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
-              <option value="行動待辦">行動待辦</option>
-              <option value="待補資料">待補資料</option>
+              ${cats.map(c => `<option value="${esc(c)}" ${(editing?.category || cats[0]) === c ? 'selected' : ''}>類別：${esc(c)}</option>`).join('')}
             </select>
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <input name="dueDate" type="date" value="${todayStr(1)}" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+            <input name="dueDate" type="date" value="${esc(editing?.dueDate || todayStr(1))}" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
             <select name="repeat" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
-              <option value="none">不重複</option>
-              <option value="daily">每日重複</option>
-              <option value="weekly">每週重複</option>
-              <option value="monthly">每月重複</option>
+              ${Object.entries(repeatLabels).map(([k, v]) => `<option value="${k}" ${(editing?.repeat || 'none') === k ? 'selected' : ''}>${v}</option>`).join('')}
             </select>
-            <input name="tags" type="text" placeholder="標籤（如：論文 效率系統）" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+            <input name="tags" type="text" value="${esc((editing?.tags || []).join(' '))}" placeholder="標籤（如：論文 效率系統）" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
           </div>
-          <div class="flex justify-end">
-            <button type="submit" class="btn-pill-orange px-7 py-2.5 text-[17px]">加入清單</button>
-          </div>
+          <div class="flex justify-end"><button type="submit" class="btn-pill-orange px-7 py-2.5 text-[17px]">${editing ? '更新任務' : '加入清單'}</button></div>
         </form>
       </div>
-
+      ${renderCategoryBar('todos', state.data.todos)}
       <div class="glass-card rounded-3xl p-6 divide-y divide-slate-100">
-        ${todos.map(t => `
+        ${pg.items.map(t => `
           <div class="py-4 first:pt-0 last:pb-0 flex flex-wrap items-center justify-between gap-3">
             <label class="flex items-start gap-3 flex-1 min-w-[240px] cursor-pointer">
               <input type="checkbox" data-toggle-todo="${t.id}" ${t.done ? 'checked' : ''} class="mt-1.5 w-5 h-5 accent-[#FF7A00]">
               <div>
                 <div class="text-[18px] font-medium ${t.done ? 'line-through text-slate-400' : 'text-[#1A1D21]'}">${esc(t.title)}</div>
                 <div class="flex flex-wrap items-center gap-2 mt-1 text-[13px]">
-                  <span class="px-2.5 py-0.5 rounded-full bg-orange-50 text-[#B85200]">${esc(t.category)}</span>
+                  <span class="px-2.5 py-0.5 rounded-full bg-orange-50 text-[#B85200]">${esc(t.category || '行動待辦')}</span>
                   ${t.dueDate ? `<span class="mono text-slate-500">期限 ${esc(t.dueDate)}</span>` : ''}
                   ${t.repeat && t.repeat !== 'none' ? `<span class="px-2.5 py-0.5 rounded-full bg-sky-50 text-[#1D5B8C] font-semibold">↻ ${repeatLabels[t.repeat]}</span>` : ''}
                   ${(t.tags || []).map(tag => `<button type="button" data-hub-tag="${esc(tag)}" class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">#${esc(tag)}</button>`).join('')}
                 </div>
               </div>
             </label>
-            <div class="flex flex-wrap items-center gap-2">
+            <div class="flex flex-wrap items-center gap-2 text-[14px]">
               ${!t.done ? `<button type="button" data-snooze-todo="${t.id}" class="btn-pill-soft px-3 py-1 text-[13px]">+1 天</button>` : ''}
               ${!t.done ? `<button type="button" data-weekend-todo="${t.id}" class="btn-pill-soft px-3 py-1 text-[13px]">移到週末</button>` : ''}
-              <button type="button" data-del="todos:${t.id}" class="text-[14px] text-slate-400 hover:text-red-600 px-2">移至回收桶</button>
+              <button type="button" data-start-edit="todos:${t.id}" class="font-semibold text-[#1D5B8C] hover:underline px-1">編輯</button>
+              <button type="button" data-del="todos:${t.id}" class="text-slate-400 hover:text-red-600 px-1">移至回收桶</button>
             </div>
-          </div>`).join('') || '<div class="py-6 text-center text-slate-500">目前沒有待辦項目</div>'}
+          </div>`).join('') || '<div class="py-6 text-center text-slate-500">目前沒有符合條件的待辦項目</div>'}
       </div>
-    `;
+      ${renderPaginationBar('todos', pg)}`;
+  }
+
+  function renderBookmarks() {
+    const editing = getEditItem('bookmarks', state.data.bookmarks);
+    const cats = getCategoryOptions('bookmarks', state.data.bookmarks);
+    const filtered = state.data.bookmarks.filter(b => matchesFilter('bookmarks', b));
+    const pg = paginateList('bookmarks', filtered);
+    return `
+      <div class="glass-card rounded-3xl p-6">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+          <div>
+            <h2 class="text-[24px] font-bold">${editing ? '編輯常用網頁' : '常用網頁收集箱'}</h2>
+            <p class="text-[15px] text-[#525B66]">依類別集中收納常用網站與線上工具，換電腦或手機都能一鍵開啟。</p>
+          </div>
+          ${editing ? `<button type="button" data-cancel-edit="1" class="btn-pill-soft px-4 py-1 text-[14px]">取消編輯</button>` : ''}
+        </div>
+        <form id="formBookmark" class="space-y-3.5">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <input name="title" type="text" required value="${esc(editing?.title || '')}" placeholder="網站名稱（如：Google Scholar / Notion）" class="sm:col-span-2 px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+            <select name="category" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+              ${cats.map(c => `<option value="${esc(c)}" ${(editing?.category || cats[0]) === c ? 'selected' : ''}>類別：${esc(c)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <input name="url" type="url" required value="${esc(editing?.url || '')}" placeholder="完整網址（https://...）" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+            <input name="tags" type="text" value="${esc((editing?.tags || []).join(' '))}" placeholder="標籤（如：AI 論文 工具）" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+          </div>
+          <input name="notes" type="text" value="${esc(editing?.notes || '')}" placeholder="網站用途簡短備註（選填）..." class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+          <div class="flex justify-end"><button type="submit" class="btn-pill-orange px-7 py-2.5 text-[17px]">${editing ? '更新網頁' : '加入網頁收集箱'}</button></div>
+        </form>
+      </div>
+      ${renderCategoryBar('bookmarks', state.data.bookmarks)}
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        ${pg.items.map(b => `
+          <article class="glass-card rounded-3xl p-6 flex flex-col justify-between gap-3">
+            <div>
+              <div class="flex items-start justify-between gap-2 mb-1.5">
+                <h3 class="text-[19px] font-bold text-[#1A1D21]">${esc(b.title)}</h3>
+                <span class="px-2.5 py-0.5 rounded-full text-[13px] font-semibold bg-sky-50 text-[#1D5B8C] shrink-0">${esc(b.category || '其他')}</span>
+              </div>
+              <a href="${esc(b.url)}" target="_blank" rel="noopener noreferrer" class="mono text-[14px] text-[#1D5B8C] underline break-all block mb-2">${esc(b.url)}</a>
+              ${b.notes ? `<p class="text-[15px] text-[#525B66] mb-2">${esc(b.notes)}</p>` : ''}
+              <div class="flex flex-wrap gap-1.5">${(b.tags || []).map(t => `<button type="button" data-hub-tag="${esc(t)}" class="text-[13px] px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600">#${esc(t)}</button>`).join('')}</div>
+            </div>
+            <div class="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-100 text-[14px]">
+              <div class="flex items-center gap-2">
+                <a href="${esc(b.url)}" target="_blank" rel="noopener noreferrer" class="btn-pill-orange px-3.5 py-1 text-[13px]">開啟 ↗</a>
+                <button type="button" data-copy-url="${esc(b.url)}" class="btn-pill-soft px-3.5 py-1 text-[13px]">複製網址</button>
+              </div>
+              <div class="flex items-center gap-3">
+                <button type="button" data-start-edit="bookmarks:${b.id}" class="font-semibold text-[#1D5B8C] hover:underline">編輯</button>
+                <button type="button" data-del="bookmarks:${b.id}" class="text-slate-400 hover:text-red-600">移至回收桶</button>
+              </div>
+            </div>
+          </article>`).join('') || '<div class="md:col-span-2 glass-card rounded-3xl p-8 text-center text-slate-500">這個分類下目前沒有收藏網頁</div>'}
+      </div>
+      ${renderPaginationBar('bookmarks', pg)}`;
+  }
+
+  function renderSnippets() {
+    const editing = getEditItem('snippets', state.data.snippets);
+    const cats = getCategoryOptions('snippets', state.data.snippets);
+    const filtered = state.data.snippets.filter(s => matchesFilter('snippets', s));
+    const pg = paginateList('snippets', filtered);
+    return `
+      <div class="glass-card rounded-3xl p-6">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+          <h2 class="text-[24px] font-bold">${editing ? '編輯常用片段' : '常用片段與書籤'}</h2>
+          ${editing ? `<button type="button" data-cancel-edit="1" class="btn-pill-soft px-4 py-1 text-[14px]">取消編輯</button>` : ''}
+        </div>
+        <form id="formSnippet" class="space-y-3.5">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <input name="title" type="text" required value="${esc(editing?.title || '')}" placeholder="名稱（如：常用 Prompt / 指令）" class="sm:col-span-2 px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+            <select name="category" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+              ${cats.map(c => `<option value="${esc(c)}" ${(editing?.category || cats[0]) === c ? 'selected' : ''}>類別：${esc(c)}</option>`).join('')}
+            </select>
+          </div>
+          <textarea name="content" rows="2" placeholder="貼上常用文字、Prompt 或代碼..." class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">${esc(editing?.content || '')}</textarea>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <input name="url" type="url" value="${esc(editing?.url || '')}" placeholder="參考網址（選填）" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+            <input name="tags" type="text" value="${esc((editing?.tags || []).join(' '))}" placeholder="標籤（如：AI 效率）" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+          </div>
+          <div class="flex justify-end"><button type="submit" class="btn-pill-orange px-7 py-2.5 text-[17px]">${editing ? '更新片段' : '收入片段庫'}</button></div>
+        </form>
+      </div>
+      ${renderCategoryBar('snippets', state.data.snippets)}
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        ${pg.items.map(s => `
+          <article class="glass-card rounded-3xl p-6 flex flex-col justify-between gap-3">
+            <div>
+              <div class="flex items-start justify-between gap-2 mb-2">
+                <h3 class="text-[19px] font-bold">${esc(s.title)}</h3>
+                <span class="px-2.5 py-0.5 rounded-full text-[13px] bg-sky-50 text-[#1D5B8C] shrink-0">${esc(s.category || '常用片段')}</span>
+              </div>
+              <p class="text-[16px] text-[#525B66] whitespace-pre-line">${esc(s.content || '')}</p>
+            </div>
+            <div class="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-100 text-[14px]">
+              <div class="flex items-center gap-2">
+                <button type="button" data-copy-snippet="${s.id}" class="btn-pill-soft px-3.5 py-1 text-[13px]">一鍵複製</button>
+                ${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer" class="font-semibold text-[#1D5B8C] hover:underline">前往 ↗</a>` : ''}
+              </div>
+              <div class="flex items-center gap-3">
+                <button type="button" data-start-edit="snippets:${s.id}" class="font-semibold text-[#1D5B8C] hover:underline">編輯</button>
+                <button type="button" data-del="snippets:${s.id}" class="text-slate-400 hover:text-red-600">移至回收桶</button>
+              </div>
+            </div>
+          </article>`).join('') || '<div class="md:col-span-2 glass-card rounded-3xl p-8 text-center text-slate-500">尚無符合條件的常用片段</div>'}
+      </div>
+      ${renderPaginationBar('snippets', pg)}`;
   }
 
   function renderVault() {
-    const items = state.data.accountHints.filter(matchesSearch);
+    const editing = getEditItem('vault', state.data.accountHints);
+    const cats = getCategoryOptions('vault', state.data.accountHints);
+    const filtered = state.data.accountHints.filter(v => matchesFilter('vault', v));
+    const pg = paginateList('vault', filtered);
     return `
       <div class="glass-card rounded-3xl p-6">
         <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div>
-            <h2 class="text-[24px] font-bold">帳號提示與安全索引（零明文密碼）</h2>
+            <h2 class="text-[24px] font-bold">${editing ? '編輯帳號提示索引' : '帳號提示與安全索引（零明文密碼）'}</h2>
             <p class="text-[15px] text-[#525B66]">僅記錄登入信箱、驗證方式與 Bitwarden 資料夾位置；實際密碼請存放於 Bitwarden。</p>
           </div>
-          <a href="https://vault.bitwarden.com/" target="_blank" rel="noopener noreferrer" class="btn-pill-soft px-4 py-2 text-[15px] inline-flex items-center gap-1.5">
-            開啟 Bitwarden Vault ↗
-          </a>
+          <div class="flex items-center gap-2">
+            ${editing ? `<button type="button" data-cancel-edit="1" class="btn-pill-soft px-4 py-1.5 text-[14px]">取消編輯</button>` : ''}
+            <a href="https://vault.bitwarden.com/" target="_blank" rel="noopener noreferrer" class="btn-pill-soft px-4 py-1.5 text-[15px]">開啟 Bitwarden ↗</a>
+          </div>
         </div>
         <form id="formVault" class="space-y-3.5">
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <input name="serviceName" type="text" required placeholder="服務名稱（如：GitHub / 網域）" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
-            <input name="loginEmail" type="text" placeholder="登入信箱或帳號提示" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+          <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            <input name="serviceName" type="text" required value="${esc(editing?.serviceName || '')}" placeholder="服務名稱..." class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+            <select name="category" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+              ${cats.map(c => `<option value="${esc(c)}" ${(editing?.category || cats[0]) === c ? 'selected' : ''}>類別：${esc(c)}</option>`).join('')}
+            </select>
+            <input name="loginEmail" type="text" value="${esc(editing?.loginEmail || '')}" placeholder="登入信箱或帳號提示" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
             <select name="authType" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
-              <option value="Google SSO">Google SSO</option>
-              <option value="Passkey / 2FA">Passkey / 2FA</option>
-              <option value="Bitwarden 密碼">Bitwarden 密碼</option>
+              ${['Google SSO','Passkey / 2FA','Bitwarden 密碼'].map(a => `<option value="${a}" ${(editing?.authType || 'Google SSO') === a ? 'selected' : ''}>${a}</option>`).join('')}
             </select>
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <input name="bitwardenFolder" type="text" placeholder="Bitwarden 資料夾位置" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
-            <input name="renewalDate" type="date" title="到期或續約提醒日（選填）" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
-            <input name="tags" type="text" placeholder="標籤（如：財務 雲端）" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+            <input name="bitwardenFolder" type="text" value="${esc(editing?.bitwardenFolder || '')}" placeholder="Bitwarden 資料夾位置" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+            <input name="renewalDate" type="date" value="${esc(editing?.renewalDate || '')}" title="到期或續約日（選填）" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+            <input name="tags" type="text" value="${esc((editing?.tags || []).join(' '))}" placeholder="標籤（如：財務 雲端）" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
           </div>
-          <input name="notes" type="text" placeholder="安全備註（請勿填寫真實密碼）..." class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
-          <div class="flex justify-end">
-            <button type="submit" class="btn-pill-orange px-7 py-2.5 text-[17px]">新增提示索引</button>
-          </div>
+          <input name="notes" type="text" value="${esc(editing?.notes || '')}" placeholder="安全備註（請勿填寫真實密碼）..." class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+          <div class="flex justify-end"><button type="submit" class="btn-pill-orange px-7 py-2.5 text-[17px]">${editing ? '更新提示索引' : '新增提示索引'}</button></div>
         </form>
       </div>
-
+      ${renderCategoryBar('vault', state.data.accountHints)}
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        ${items.map(v => `
+        ${pg.items.map(v => `
           <article class="glass-card rounded-3xl p-6">
             <div class="flex items-start justify-between gap-2 mb-2">
-              <h3 class="text-[20px] font-bold">${esc(v.serviceName)}</h3>
-              <button type="button" data-del="accountHints:${v.id}" class="text-[14px] text-slate-400 hover:text-red-600">移至回收桶</button>
+              <div class="flex flex-wrap items-center gap-2">
+                <h3 class="text-[20px] font-bold">${esc(v.serviceName)}</h3>
+                <span class="px-2.5 py-0.5 rounded-full text-[13px] font-semibold bg-sky-50 text-[#1D5B8C]">${esc(v.category || '雲端開發')}</span>
+              </div>
+              <div class="flex items-center gap-3 text-[14px] shrink-0">
+                <button type="button" data-start-edit="vault:${v.id}" class="font-semibold text-[#1D5B8C] hover:underline">編輯</button>
+                <button type="button" data-del="accountHints:${v.id}" class="text-slate-400 hover:text-red-600">移至回收桶</button>
+              </div>
             </div>
             <div class="sensitive-content space-y-1.5 text-[16px] text-[#525B66]">
               <div><strong class="text-[#1A1D21]">帳號提示：</strong><span class="mono">${esc(v.loginEmail || '未填寫')}</span></div>
@@ -1546,56 +1623,9 @@
               ${v.renewalDate ? `<div><strong class="text-[#1A1D21]">續約／到期日：</strong><span class="mono text-[#B85200]">${esc(v.renewalDate)}</span></div>` : ''}
               ${v.notes ? `<div class="pt-1 text-[15px]">${esc(v.notes)}</div>` : ''}
             </div>
-          </article>`).join('') || '<div class="md:col-span-2 glass-card rounded-3xl p-8 text-center text-slate-500">尚無帳號提示紀錄</div>'}
+          </article>`).join('') || '<div class="md:col-span-2 glass-card rounded-3xl p-8 text-center text-slate-500">尚無符合條件的帳號提示</div>'}
       </div>
-    `;
-  }
-
-  function renderSnippets() {
-    const items = state.data.snippets.filter(matchesSearch);
-    return `
-      <div class="glass-card rounded-3xl p-6">
-        <h2 class="text-[24px] font-bold mb-4">常用片段與工具書籤庫</h2>
-        <form id="formSnippet" class="space-y-3.5">
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <input name="title" type="text" required placeholder="名稱（如：常用 Prompt / 工具網站）" class="sm:col-span-2 px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
-            <select name="category" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
-              <option value="常用片段">常用片段</option>
-              <option value="工具書籤">工具書籤</option>
-              <option value="指令代碼">指令代碼</option>
-            </select>
-          </div>
-          <textarea name="content" rows="2" placeholder="貼上常用文字、Prompt 或簡短說明..." class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]"></textarea>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <input name="url" type="url" placeholder="網址連結（選填，https://...）" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
-            <input name="tags" type="text" placeholder="標籤（如：AI 工具）" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
-          </div>
-          <div class="flex justify-end">
-            <button type="submit" class="btn-pill-orange px-7 py-2.5 text-[17px]">收入書籤庫</button>
-          </div>
-        </form>
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        ${items.map(s => `
-          <article class="glass-card rounded-3xl p-6 flex flex-col justify-between gap-3">
-            <div>
-              <div class="flex items-start justify-between gap-2 mb-2">
-                <h3 class="text-[19px] font-bold">${esc(s.title)}</h3>
-                <span class="px-2.5 py-0.5 rounded-full text-[13px] bg-sky-50 text-[#1D5B8C] shrink-0">${esc(s.category)}</span>
-              </div>
-              <p class="text-[16px] text-[#525B66] whitespace-pre-line">${esc(s.content || '')}</p>
-            </div>
-            <div class="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-100">
-              <div class="flex items-center gap-2">
-                <button type="button" data-copy-snippet="${s.id}" class="btn-pill-soft px-3.5 py-1 text-[14px]">一鍵複製</button>
-                ${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer" class="text-[14px] font-semibold text-[#1D5B8C] hover:underline">前往 ↗</a>` : ''}
-              </div>
-              <button type="button" data-del="snippets:${s.id}" class="text-[14px] text-slate-400 hover:text-red-600">移至回收桶</button>
-            </div>
-          </article>`).join('') || '<div class="md:col-span-2 glass-card rounded-3xl p-8 text-center text-slate-500">尚無常用片段或書籤</div>'}
-      </div>
-    `;
+      ${renderPaginationBar('vault', pg)}`;
   }
 
   function renderProjectHub() {
@@ -1603,77 +1633,47 @@
     if (!state.selectedHubTag && tags.length) state.selectedHubTag = tags[0][0];
     const tag = state.selectedHubTag;
     const hasTag = item => (item.tags || []).includes(tag);
-
     const diaries = state.data.diaryEntries.filter(hasTag);
     const ideas = state.data.ideas.filter(hasTag);
     const learning = state.data.learningLogs.filter(hasTag);
     const todos = state.data.todos.filter(hasTag);
-    const snippets = state.data.snippets.filter(hasTag);
     const books = state.data.books.filter(hasTag);
-
+    const bookmarks = state.data.bookmarks.filter(hasTag);
+    const snippets = state.data.snippets.filter(hasTag);
     return `
       <div class="glass-card rounded-3xl p-6">
         <div class="flex flex-wrap items-center justify-between gap-3 mb-2">
           <h2 class="text-[24px] font-bold">專案聚合總覽（Project Hub）</h2>
           ${tag ? `<button id="btnExportHubMd" type="button" class="btn-pill-soft px-4 py-1.5 text-[15px]">匯出 #${esc(tag)} 為 Markdown</button>` : ''}
         </div>
-        <p class="text-[16px] text-[#525B66] mb-4">選擇任一標籤，將分散於五大模組與書籤庫的相關內容收斂在同一個畫面。</p>
+        <p class="text-[16px] text-[#525B66] mb-4">選擇任一標籤，將分散於各模組的相關資料收斂在同一頁。</p>
         <div class="flex flex-wrap gap-2">
-          ${tags.map(([t, cnt]) => `
-            <button type="button" data-hub-tag="${esc(t)}" class="px-4 py-2 rounded-full text-[16px] font-semibold transition ${t === tag ? 'bg-[#FF7A00] text-white' : 'bg-slate-100 text-slate-700 hover:bg-orange-100'}">
-              #${esc(t)} (${cnt})
-            </button>`).join('') || '<span class="text-slate-500">尚無可用標籤</span>'}
+          ${tags.map(([t, cnt]) => `<button type="button" data-hub-tag="${esc(t)}" class="px-4 py-2 rounded-full text-[16px] font-semibold transition ${t === tag ? 'bg-[#FF7A00] text-white' : 'bg-slate-100 text-slate-700 hover:bg-orange-100'}">#${esc(t)} (${cnt})</button>`).join('') || '<span class="text-slate-500">尚無可用標籤</span>'}
         </div>
       </div>
-
       ${tag ? `
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div class="glass-card rounded-3xl p-6">
-            <h3 class="text-[19px] font-bold mb-3 text-[#B85200]">相關待辦（${todos.length}）</h3>
-            <ul class="space-y-2 text-[16px]">
-              ${todos.map(t => `<li>${t.done ? '✓' : '○'} ${esc(t.title)} <span class="mono text-[13px] text-slate-400">${t.dueDate || ''}</span></li>`).join('') || '<li class="text-slate-400">無</li>'}
-            </ul>
-          </div>
-          <div class="glass-card rounded-3xl p-6">
-            <h3 class="text-[19px] font-bold mb-3 text-[#1D5B8C]">相關學習（${learning.length}）</h3>
-            <ul class="space-y-2 text-[16px]">
-              ${learning.map(l => `<li>${esc(l.topic)} — <strong class="mono">${l.progressPct}%</strong>（${l.minutesSpent}m）</li>`).join('') || '<li class="text-slate-400">無</li>'}
-            </ul>
-          </div>
-          <div class="glass-card rounded-3xl p-6">
-            <h3 class="text-[19px] font-bold mb-3">相關 Idea（${ideas.length}）</h3>
-            <ul class="space-y-2 text-[16px]">
-              ${ideas.map(i => `<li>• ${esc(i.title)}（${esc(i.status)}）</li>`).join('') || '<li class="text-slate-400">無</li>'}
-            </ul>
-          </div>
-          <div class="glass-card rounded-3xl p-6">
-            <h3 class="text-[19px] font-bold mb-3">相關日記與書籤（${diaries.length + snippets.length}）</h3>
-            <ul class="space-y-2 text-[16px]">
-              ${diaries.map(d => `<li><span class="mono text-[14px] text-slate-500">${esc(d.date)}</span> ${esc(d.content.slice(0, 42))}...</li>`).join('')}
-              ${books.map(b => `<li>[書籍・${esc(b.category)}] ${esc(b.title)}（${esc(b.status)}）</li>`).join('')}
-              ${snippets.map(s => `<li>[書籤] ${esc(s.title)}</li>`).join('')}
-              ${(diaries.length + snippets.length + books.length === 0) ? '<li class="text-slate-400">無</li>' : ''}
-            </ul>
-          </div>
-        </div>` : ''}
-    `;
+          <div class="glass-card rounded-3xl p-6"><h3 class="text-[19px] font-bold mb-3 text-[#B85200]">相關待辦（${todos.length}）</h3><ul class="space-y-2 text-[16px]">${todos.map(t => `<li>${t.done ? '✓' : '○'} ${esc(t.title)}</li>`).join('') || '<li class="text-slate-400">無</li>'}</ul></div>
+          <div class="glass-card rounded-3xl p-6"><h3 class="text-[19px] font-bold mb-3 text-[#1D5B8C]">相關學習與書籍（${learning.length + books.length}）</h3><ul class="space-y-2 text-[16px]">${learning.map(l => `<li>[學習] ${esc(l.topic)} — <strong class="mono">${l.progressPct}%</strong></li>`).join('')}${books.map(b => `<li>[書籍] 《${esc(b.title)}》（${esc(b.status)}）</li>`).join('')}${(learning.length + books.length === 0) ? '<li class="text-slate-400">無</li>' : ''}</ul></div>
+          <div class="glass-card rounded-3xl p-6"><h3 class="text-[19px] font-bold mb-3">相關 Idea（${ideas.length}）</h3><ul class="space-y-2 text-[16px]">${ideas.map(i => `<li>• ${esc(i.title)}（${esc(i.status)}）</li>`).join('') || '<li class="text-slate-400">無</li>'}</ul></div>
+          <div class="glass-card rounded-3xl p-6"><h3 class="text-[19px] font-bold mb-3">相關日記・網頁・片段（${diaries.length + bookmarks.length + snippets.length}）</h3><ul class="space-y-2 text-[16px]">${diaries.map(d => `<li><span class="mono text-[14px] text-slate-500">${esc(d.date)}</span> ${esc(d.content.slice(0, 38))}...</li>`).join('')}${bookmarks.map(b => `<li>[網頁] <a href="${esc(b.url)}" target="_blank" rel="noopener noreferrer" class="text-[#1D5B8C] underline">${esc(b.title)}</a></li>`).join('')}${snippets.map(s => `<li>[片段] ${esc(s.title)}</li>`).join('')}${(diaries.length + bookmarks.length + snippets.length === 0) ? '<li class="text-slate-400">無</li>' : ''}</ul></div>
+        </div>` : ''}`;
   }
 
   function renderTrash() {
-    const items = state.data.trash;
+    const pg = paginateList('trash', state.data.trash);
     return `
       <div class="glass-card rounded-3xl p-6">
-        <div class="flex flex-wrap items-center justify-between gap-3 mb-2">
+        <div class="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 class="text-[24px] font-bold">30 天資源回收桶</h2>
             <p class="text-[15px] text-[#525B66]">刪除的紀錄會在此保留 30 天，隨時可一鍵還原回原本的模組。</p>
           </div>
-          ${items.length ? `<button id="btnEmptyTrash" type="button" class="px-4 py-2 rounded-full bg-red-50 text-red-600 font-semibold text-[15px] hover:bg-red-100">清空回收桶</button>` : ''}
+          ${state.data.trash.length ? `<button id="btnEmptyTrash" type="button" class="px-4 py-2 rounded-full bg-red-50 text-red-600 font-semibold text-[15px] hover:bg-red-100">清空回收桶</button>` : ''}
         </div>
       </div>
-
       <div class="space-y-3">
-        ${items.map(tr => {
+        ${pg.items.map(tr => {
           const title = tr.item.title || tr.item.topic || tr.item.serviceName || (tr.item.content || '').slice(0, 50);
           return `
           <article class="glass-card rounded-3xl p-5 flex flex-wrap items-center justify-between gap-3">
@@ -1689,454 +1689,294 @@
           </article>`;
         }).join('') || '<div class="glass-card rounded-3xl p-8 text-center text-slate-500">回收桶目前是空的</div>'}
       </div>
-    `;
+      ${renderPaginationBar('trash', pg)}`;
   }
 
   function renderAll() {
     if (state.mode === 'locked') return;
     renderSidebar();
-    const main = document.getElementById('mainContent');
     const views = {
-      dashboard: renderDashboard,
-      inbox: renderInbox,
-      diary: renderDiary,
-      ideas: renderIdeas,
-      learning: renderLearning,
-      books: renderBooks,
-      todos: renderTodos,
-      vault: renderVault,
-      snippets: renderSnippets,
-      hub: renderProjectHub,
-      trash: renderTrash
+      dashboard: renderDashboard, inbox: renderInbox, diary: renderDiary,
+      ideas: renderIdeas, learning: renderLearning, books: renderBooks,
+      todos: renderTodos, bookmarks: renderBookmarks, snippets: renderSnippets,
+      vault: renderVault, hub: renderProjectHub, trash: renderTrash
     };
-    main.innerHTML = (views[state.activeTab] || renderDashboard)();
+    document.getElementById('mainContent').innerHTML = (views[state.activeTab] || renderDashboard)();
     bindMainViewHandlers();
   }
 
-  // ==================== DYNAMIC HANDLERS ====================
+  // ==================== HANDLERS ====================
   function bindMainViewHandlers() {
     const main = document.getElementById('mainContent');
 
-    // Inbox form & triage
-    const formInbox = document.getElementById('formInbox');
-    if (formInbox) {
-      formInbox.addEventListener('submit', e => {
-        e.preventDefault();
-        const fd = new FormData(formInbox);
-        state.data.inbox.unshift({
-          id: uid('in'), content: String(fd.get('content')).trim(),
-          url: String(fd.get('url') || '').trim(),
-          createdAt: todayStr(0), updatedAt: new Date().toISOString()
-        });
-        persistData();
-        showToast('已存入暫存收件匣');
+    // Universal Category Filter, Pagination, Edit & Cancel Edit
+    main.querySelectorAll('[data-cat-filter]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = btn.dataset.catFilter.indexOf(':');
+        const tab = btn.dataset.catFilter.slice(0, idx);
+        const cat = btn.dataset.catFilter.slice(idx + 1);
+        state.filters[tab] = cat;
+        state.pages[tab] = 1;
+        renderAll();
       });
+    });
+    main.querySelectorAll('[data-page-nav]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const [tab, p] = btn.dataset.pageNav.split(':');
+        state.pages[tab] = Number(p);
+        renderAll();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    });
+    main.querySelectorAll('[data-page-size-select]').forEach(sel => {
+      sel.addEventListener('change', () => {
+        state.pageSize = Number(sel.value);
+        Object.keys(state.pages).forEach(k => { state.pages[k] = 1; });
+        renderAll();
+      });
+    });
+    main.querySelectorAll('[data-start-edit]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const [tab, id] = btn.dataset.startEdit.split(':');
+        state.editing = { tab, id };
+        renderAll();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    });
+    main.querySelectorAll('[data-cancel-edit]').forEach(btn => {
+      btn.addEventListener('click', () => { state.editing = { tab: '', id: '' }; renderAll(); });
+    });
+
+    // Helper for Create vs Update
+    function upsertItem(tab, colKey, payload, createdMsg, updatedMsg) {
+      if (state.editing.tab === tab && state.editing.id) {
+        const idx = state.data[colKey].findIndex(x => x.id === state.editing.id);
+        if (idx >= 0) state.data[colKey][idx] = { ...state.data[colKey][idx], ...payload, updatedAt: new Date().toISOString() };
+        state.editing = { tab: '', id: '' };
+        persistData();
+        showToast(updatedMsg);
+      } else {
+        state.data[colKey].unshift({ id: uid(colKey.slice(0, 2)), ...payload, updatedAt: new Date().toISOString() });
+        state.pages[tab] = 1;
+        persistData();
+        showToast(createdMsg);
+      }
     }
+
+    // Forms (All 9 modules support Create + Edit!)
+    const formInbox = document.getElementById('formInbox');
+    if (formInbox) formInbox.addEventListener('submit', e => {
+      e.preventDefault(); const fd = new FormData(formInbox);
+      upsertItem('inbox', 'inbox', {
+        category: fd.get('category'), content: String(fd.get('content')).trim(),
+        url: String(fd.get('url') || '').trim(), createdAt: todayStr(0)
+      }, '已存入暫存收件匣', '已更新收件匣項目');
+    });
+
+    const formDiary = document.getElementById('formDiary');
+    if (formDiary) formDiary.addEventListener('submit', e => {
+      e.preventDefault(); const fd = new FormData(formDiary);
+      const editing = getEditItem('diary', state.data.diaryEntries);
+      upsertItem('diary', 'diaryEntries', {
+        date: fd.get('date'), category: fd.get('category'), mood: Number(fd.get('mood')),
+        habits: fd.getAll('habit'), content: String(fd.get('content')).trim(),
+        tags: parseTags(fd.get('tags')), attachment: state.pendingDiaryAttachment || editing?.attachment || null
+      }, '已儲存今日日記', '已更新日記內容');
+      state.pendingDiaryAttachment = null;
+    });
+
+    const formIdea = document.getElementById('formIdea');
+    if (formIdea) formIdea.addEventListener('submit', e => {
+      e.preventDefault(); const fd = new FormData(formIdea);
+      const editing = getEditItem('ideas', state.data.ideas);
+      upsertItem('ideas', 'ideas', {
+        title: String(fd.get('title')).trim(), category: fd.get('category'),
+        priority: fd.get('priority'), status: fd.get('status'),
+        notes: String(fd.get('notes') || '').trim(), tags: parseTags(fd.get('tags')),
+        linkedTodoId: editing?.linkedTodoId || ''
+      }, '已加入創意想法區', '已更新創意想法');
+    });
+
+    const formLearning = document.getElementById('formLearning');
+    if (formLearning) formLearning.addEventListener('submit', e => {
+      e.preventDefault(); const fd = new FormData(formLearning);
+      const editing = getEditItem('learning', state.data.learningLogs);
+      upsertItem('learning', 'learningLogs', {
+        topic: String(fd.get('topic')).trim(), category: fd.get('category'),
+        progressPct: Number(fd.get('progressPct')), minutesSpent: Number(fd.get('minutesSpent') || 0),
+        milestone: String(fd.get('milestone') || '').trim(), resourceUrl: editing?.resourceUrl || '',
+        date: editing?.date || todayStr(0), tags: parseTags(fd.get('tags'))
+      }, '已新增學習紀錄', '已更新學習紀錄');
+    });
+
+    const formBook = document.getElementById('formBook');
+    if (formBook) formBook.addEventListener('submit', e => {
+      e.preventDefault(); const fd = new FormData(formBook);
+      const status = fd.get('status');
+      upsertItem('books', 'books', {
+        title: String(fd.get('title')).trim(), author: String(fd.get('author') || '').trim(),
+        category: fd.get('category'), status, rating: Number(fd.get('rating') || 5),
+        progressPct: status === '已讀完' ? 100 : Number(fd.get('progressPct') || 0),
+        finishedDate: fd.get('finishedDate') || (status === '已讀完' ? todayStr(0) : ''),
+        oneLiner: String(fd.get('oneLiner') || '').trim(),
+        takeaways: String(fd.get('takeaways') || '').trim(),
+        quotes: String(fd.get('quotes') || '').trim(), tags: parseTags(fd.get('tags'))
+      }, '已收入閱讀書庫', '已更新書籍與心得');
+    });
+
+    const formTodo = document.getElementById('formTodo');
+    if (formTodo) formTodo.addEventListener('submit', e => {
+      e.preventDefault(); const fd = new FormData(formTodo);
+      const editing = getEditItem('todos', state.data.todos);
+      upsertItem('todos', 'todos', {
+        title: String(fd.get('title')).trim(), category: fd.get('category'),
+        dueDate: fd.get('dueDate'), done: editing?.done || false, repeat: fd.get('repeat'),
+        sourceIdeaId: editing?.sourceIdeaId || '', tags: parseTags(fd.get('tags'))
+      }, '已新增待辦項目', '已更新待辦項目');
+    });
+
+    const formBookmark = document.getElementById('formBookmark');
+    if (formBookmark) formBookmark.addEventListener('submit', e => {
+      e.preventDefault(); const fd = new FormData(formBookmark);
+      upsertItem('bookmarks', 'bookmarks', {
+        title: String(fd.get('title')).trim(), url: String(fd.get('url')).trim(),
+        category: fd.get('category'), notes: String(fd.get('notes') || '').trim(),
+        tags: parseTags(fd.get('tags'))
+      }, '已收入常用網頁收集箱', '已更新網頁收藏');
+    });
+
+    const formSnippet = document.getElementById('formSnippet');
+    if (formSnippet) formSnippet.addEventListener('submit', e => {
+      e.preventDefault(); const fd = new FormData(formSnippet);
+      upsertItem('snippets', 'snippets', {
+        title: String(fd.get('title')).trim(), category: fd.get('category'),
+        content: String(fd.get('content') || '').trim(), url: String(fd.get('url') || '').trim(),
+        tags: parseTags(fd.get('tags'))
+      }, '已收入常用片段庫', '已更新片段內容');
+    });
+
+    const formVault = document.getElementById('formVault');
+    if (formVault) formVault.addEventListener('submit', e => {
+      e.preventDefault(); const fd = new FormData(formVault);
+      upsertItem('vault', 'accountHints', {
+        serviceName: String(fd.get('serviceName')).trim(), category: fd.get('category'),
+        loginEmail: String(fd.get('loginEmail') || '').trim(), authType: fd.get('authType'),
+        bitwardenFolder: String(fd.get('bitwardenFolder') || '').trim(),
+        renewalDate: fd.get('renewalDate'), notes: String(fd.get('notes') || '').trim(),
+        tags: parseTags(fd.get('tags'))
+      }, '已儲存帳號提示索引', '已更新帳號提示索引');
+    });
+
+    // Triage from Inbox
     main.querySelectorAll('[data-triage]').forEach(btn => {
       btn.addEventListener('click', () => {
         const [dest, id] = btn.dataset.triage.split(':');
         const item = state.data.inbox.find(x => x.id === id);
         if (!item) return;
-        if (dest === 'idea') {
-          state.data.ideas.unshift({ id: uid('i'), title: item.content.slice(0, 48), notes: item.url ? `${item.content}\n${item.url}` : item.content, status: '萌芽', priority: '中', tags: ['Inbox轉入'], linkedTodoId: '', updatedAt: new Date().toISOString() });
-        } else if (dest === 'todo') {
-          state.data.todos.unshift({ id: uid('t'), title: item.content.slice(0, 60), category: '行動待辦', dueDate: todayStr(2), done: false, repeat: 'none', sourceIdeaId: '', tags: ['Inbox轉入'], updatedAt: new Date().toISOString() });
-        } else if (dest === 'diary') {
-          state.data.diaryEntries.unshift({ id: uid('d'), date: todayStr(0), mood: 4, habits: ['寫筆記'], content: item.url ? `${item.content}\n參考連結：${item.url}` : item.content, tags: ['Inbox轉入'], attachment: null, updatedAt: new Date().toISOString() });
-        } else if (dest === 'snippet') {
-          state.data.snippets.unshift({ id: uid('s'), title: item.content.slice(0, 36), category: item.url ? '工具書籤' : '常用片段', content: item.content, url: item.url || '', tags: ['Inbox轉入'], updatedAt: new Date().toISOString() });
-        }
+        if (dest === 'idea') state.data.ideas.unshift({ id: uid('i'), category: '產品點子', title: item.content.slice(0, 48), notes: item.url ? `${item.content}\n${item.url}` : item.content, status: '萌芽', priority: '中', tags: ['Inbox轉入'], linkedTodoId: '', updatedAt: new Date().toISOString() });
+        else if (dest === 'todo') state.data.todos.unshift({ id: uid('t'), category: '行動待辦', title: item.content.slice(0, 60), dueDate: todayStr(2), done: false, repeat: 'none', sourceIdeaId: '', tags: ['Inbox轉入'], updatedAt: new Date().toISOString() });
+        else if (dest === 'diary') state.data.diaryEntries.unshift({ id: uid('d'), category: '日常生活', date: todayStr(0), mood: 4, habits: ['寫筆記'], content: item.url ? `${item.content}\n參考連結：${item.url}` : item.content, tags: ['Inbox轉入'], attachment: null, updatedAt: new Date().toISOString() });
+        else if (dest === 'bookmark') state.data.bookmarks.unshift({ id: uid('bm'), category: 'AI 工具', title: item.content.slice(0, 36), url: item.url || 'https://', notes: item.content, tags: ['Inbox轉入'], updatedAt: new Date().toISOString() });
         state.data.inbox = state.data.inbox.filter(x => x.id !== id);
         persistData();
         showToast('已成功轉入目標模組');
       });
     });
 
-    // Diary templates, voice & attachment
+    // Diary voice, attachment & templates
     const btnDiaryVoice = document.getElementById('btnDiaryVoice');
-    if (btnDiaryVoice) {
-      btnDiaryVoice.addEventListener('click', () => toggleVoiceInput(document.getElementById('diaryTextarea'), btnDiaryVoice));
-    }
+    if (btnDiaryVoice) btnDiaryVoice.addEventListener('click', () => toggleVoiceInput(document.getElementById('diaryTextarea'), btnDiaryVoice));
     const diaryFileInput = document.getElementById('diaryFileInput');
     if (diaryFileInput) {
       diaryFileInput.addEventListener('change', async (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
+        const file = e.target.files?.[0]; if (!file) return;
         const nameEl = document.getElementById('diaryFileName');
         if (nameEl) nameEl.textContent = `處理中：${file.name}`;
         let previewDataUrl = '';
         if (file.type.startsWith('image/') && file.size < 1200000) {
-          previewDataUrl = await new Promise(res => {
-            const r = new FileReader();
-            r.onload = () => res(String(r.result));
-            r.onerror = () => res('');
-            r.readAsDataURL(file);
-          });
+          previewDataUrl = await new Promise(res => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = () => res(''); r.readAsDataURL(file); });
         }
         const driveInfo = await uploadAttachmentToDrive(file);
-        state.pendingDiaryAttachment = {
-          name: file.name,
-          mimeType: file.type,
-          previewDataUrl,
-          driveFileId: driveInfo?.id || '',
-          webViewLink: driveInfo?.webViewLink || ''
-        };
+        state.pendingDiaryAttachment = { name: file.name, mimeType: file.type, previewDataUrl, driveFileId: driveInfo?.id || '', webViewLink: driveInfo?.webViewLink || '' };
         if (nameEl) nameEl.textContent = driveInfo?.id ? `已上傳 Drive：${file.name}` : `已附加：${file.name}`;
-        showToast(driveInfo?.id ? '附件已上傳至 Google Drive attachments 資料夾' : '已附加檔案（將於儲存日記時保留）');
+        showToast(driveInfo?.id ? '附件已上傳至 Google Drive' : '已附加檔案');
       });
     }
-
     main.querySelectorAll('[data-tpl]').forEach(btn => {
       btn.addEventListener('click', () => {
-        const ta = document.getElementById('diaryTextarea');
-        if (!ta) return;
-        ta.value = btn.dataset.tpl === 'review'
-          ? '【今日完成】\n-\n【卡關與觀察】\n-\n【明日最重要的一件事】\n-'
-          : '【今天的三件好事】\n1. \n2. \n3. ';
+        const ta = document.getElementById('diaryTextarea'); if (!ta) return;
+        ta.value = btn.dataset.tpl === 'review' ? '【今日完成】\n-\n【卡關與觀察】\n-\n【明日最重要的一件事】\n-' : '【今天的三件好事】\n1. \n2. \n3. ';
         ta.focus();
       });
     });
 
-    // Markdown exports (Diary, Learning, Project Hub)
-    main.querySelectorAll('[data-md-diary]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const e = state.data.diaryEntries.find(x => x.id === btn.dataset.mdDiary);
-        if (!e) return;
-        const md = `# 日記 ${e.date}\n\n- 心情：${e.mood}/5\n- 習慣：${(e.habits || []).join('、') || '無'}\n- 標籤：${(e.tags || []).map(t => '#' + t).join(' ')}\n\n${e.content}\n`;
-        downloadTextFile(`diary_${e.date}.md`, md);
-        showToast('已匯出日記 Markdown');
-      });
+    // Sliders & Book status filter
+    const learnRange = document.getElementById('learnRange');
+    if (learnRange) learnRange.addEventListener('input', () => { document.getElementById('learnRangeVal').textContent = `${learnRange.value}%`; });
+    const bookRange = document.getElementById('bookRange');
+    if (bookRange) bookRange.addEventListener('input', () => { document.getElementById('bookRangeVal').textContent = `${bookRange.value}%`; });
+    main.querySelectorAll('[data-book-status]').forEach(btn => {
+      btn.addEventListener('click', () => { state.bookFilterStatus = btn.dataset.bookStatus; state.pages.books = 1; renderAll(); });
     });
-    main.querySelectorAll('[data-md-learn]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const l = state.data.learningLogs.find(x => x.id === btn.dataset.mdLearn);
-        if (!l) return;
-        const md = `# 學習筆記：${l.topic}\n\n- 日期：${l.date}\n- 完成度：${l.progressPct}%\n- 累積投入：${l.minutesSpent} 分鐘\n- 標籤：${(l.tags || []).map(t => '#' + t).join(' ')}\n\n## 重點里程碑\n${l.milestone || '無'}\n`;
-        downloadTextFile(`learning_${l.date}.md`, md);
-        showToast('已匯出學習筆記 Markdown');
-      });
-    });
-    const btnExportHubMd = document.getElementById('btnExportHubMd');
-    if (btnExportHubMd) {
-      btnExportHubMd.addEventListener('click', () => {
-        const tag = state.selectedHubTag;
-        const hasTag = x => (x.tags || []).includes(tag);
-        const md = [
-          `# 專案總覽：#${tag}`,
-          '',
-          '## 待辦任務',
-          ...state.data.todos.filter(hasTag).map(t => `- [${t.done ? 'x' : ' '}] ${t.title} (${t.dueDate || '無期限'})`),
-          '',
-          '## 學習進度',
-          ...state.data.learningLogs.filter(hasTag).map(l => `- ${l.topic}：${l.progressPct}%（${l.minutesSpent}m）— ${l.milestone}`),
-          '',
-          '## 相關 Idea',
-          ...state.data.ideas.filter(hasTag).map(i => `- [${i.status}] ${i.title}：${i.notes}`),
-          '',
-          '## 相關日記',
-          ...state.data.diaryEntries.filter(hasTag).map(d => `- [${d.date}] ${d.content}`)
-        ].join('\n');
-        downloadTextFile(`project_${tag}.md`, md);
-        showToast(`已匯出 #${tag} 專案 Markdown`);
-      });
-    }
 
     // Pomodoro handlers
     const pomoSelect = document.getElementById('pomoTopicSelect');
     if (pomoSelect) pomoSelect.addEventListener('change', () => { state.pomo.topicId = pomoSelect.value; });
     const btnPomoToggle = document.getElementById('btnPomoToggle');
-    if (btnPomoToggle) {
-      btnPomoToggle.addEventListener('click', () => {
-        if (state.pomo.running) {
-          clearInterval(state.pomo.timerId);
-          state.pomo.running = false;
-          renderAll();
-        } else {
-          startPomodoro();
-        }
-      });
-    }
+    if (btnPomoToggle) btnPomoToggle.addEventListener('click', () => { if (state.pomo.running) { clearInterval(state.pomo.timerId); state.pomo.running = false; renderAll(); } else startPomodoro(); });
     const btnPomoReset = document.getElementById('btnPomoReset');
-    if (btnPomoReset) {
-      btnPomoReset.addEventListener('click', () => {
-        clearInterval(state.pomo.timerId);
-        state.pomo.running = false;
-        state.pomo.secondsLeft = state.pomo.mode === 'focus' ? 25 * 60 : 5 * 60;
-        renderAll();
-      });
-    }
+    if (btnPomoReset) btnPomoReset.addEventListener('click', () => { clearInterval(state.pomo.timerId); state.pomo.running = false; state.pomo.secondsLeft = state.pomo.mode === 'focus' ? 25 * 60 : 5 * 60; renderAll(); });
     const btnPomoModeFocus = document.getElementById('btnPomoModeFocus');
-    if (btnPomoModeFocus) {
-      btnPomoModeFocus.addEventListener('click', () => {
-        clearInterval(state.pomo.timerId);
-        state.pomo.running = false;
-        state.pomo.mode = 'focus';
-        state.pomo.secondsLeft = 25 * 60;
-        renderAll();
-      });
-    }
+    if (btnPomoModeFocus) btnPomoModeFocus.addEventListener('click', () => { clearInterval(state.pomo.timerId); state.pomo.running = false; state.pomo.mode = 'focus'; state.pomo.secondsLeft = 25 * 60; renderAll(); });
     const btnPomoModeBreak = document.getElementById('btnPomoModeBreak');
-    if (btnPomoModeBreak) {
-      btnPomoModeBreak.addEventListener('click', () => {
-        clearInterval(state.pomo.timerId);
-        state.pomo.running = false;
-        state.pomo.mode = 'break';
-        state.pomo.secondsLeft = 5 * 60;
-        renderAll();
-      });
-    }
+    if (btnPomoModeBreak) btnPomoModeBreak.addEventListener('click', () => { clearInterval(state.pomo.timerId); state.pomo.running = false; state.pomo.mode = 'break'; state.pomo.secondsLeft = 5 * 60; renderAll(); });
     const btnPomoLogNow = document.getElementById('btnPomoLogNow');
     if (btnPomoLogNow) btnPomoLogNow.addEventListener('click', () => creditPomodoroMinutes(25));
 
-
-    // Books module handlers
-    const bookRange = document.getElementById('bookRange');
-    if (bookRange) {
-      bookRange.addEventListener('input', () => {
-        document.getElementById('bookRangeVal').textContent = `${bookRange.value}%`;
-      });
-    }
-    const btnCancelEditBook = document.getElementById('btnCancelEditBook');
-    if (btnCancelEditBook) {
-      btnCancelEditBook.addEventListener('click', () => { state.editingBookId = ''; renderAll(); });
-    }
-    const formBook = document.getElementById('formBook');
-    if (formBook) {
-      formBook.addEventListener('submit', e => {
-        e.preventDefault();
-        const fd = new FormData(formBook);
-        const status = fd.get('status');
-        const pct = status === '已讀完' ? 100 : Number(fd.get('progressPct') || 0);
-        const finishedDate = fd.get('finishedDate') || (status === '已讀完' ? todayStr(0) : '');
-        const payload = {
-          title: String(fd.get('title')).trim(),
-          author: String(fd.get('author') || '').trim(),
-          category: fd.get('category'),
-          status,
-          rating: Number(fd.get('rating') || 5),
-          progressPct: pct,
-          finishedDate,
-          oneLiner: String(fd.get('oneLiner') || '').trim(),
-          takeaways: String(fd.get('takeaways') || '').trim(),
-          quotes: String(fd.get('quotes') || '').trim(),
-          tags: parseTags(fd.get('tags')),
-          updatedAt: new Date().toISOString()
-        };
-        if (state.editingBookId) {
-          const idx = state.data.books.findIndex(b => b.id === state.editingBookId);
-          if (idx >= 0) state.data.books[idx] = { ...state.data.books[idx], ...payload };
-          state.editingBookId = '';
-          persistData();
-          showToast('已更新書籍與心得');
-        } else {
-          state.data.books.unshift({ id: uid('b'), ...payload });
-          persistData();
-          showToast('已收入閱讀書庫');
-        }
-      });
-    }
-    main.querySelectorAll('[data-book-status]').forEach(btn => {
-      btn.addEventListener('click', () => { state.bookFilterStatus = btn.dataset.bookStatus; renderAll(); });
-    });
-    main.querySelectorAll('[data-book-cat]').forEach(btn => {
-      btn.addEventListener('click', () => { state.bookFilterCategory = btn.dataset.bookCat; renderAll(); });
-    });
-    main.querySelectorAll('[data-edit-book]').forEach(btn => {
+    // Cross-module actions
+    main.querySelectorAll('[data-promote-idea]').forEach(btn => {
       btn.addEventListener('click', () => {
-        state.editingBookId = btn.dataset.editBook;
-        renderAll();
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        const idea = state.data.ideas.find(x => x.id === btn.dataset.promoteIdea); if (!idea) return;
+        const tid = uid('t');
+        state.data.todos.unshift({ id: tid, title: `[靈感落地] ${idea.title}`, category: '行動待辦', dueDate: todayStr(3), done: false, repeat: 'none', sourceIdeaId: idea.id, tags: [...(idea.tags || [])], updatedAt: new Date().toISOString() });
+        idea.linkedTodoId = tid; idea.status = '評估中'; idea.updatedAt = new Date().toISOString();
+        persistData(); showToast('已一鍵轉為待辦任務');
+      });
+    });
+    main.querySelectorAll('[data-bump-learn]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const l = state.data.learningLogs.find(x => x.id === btn.dataset.bumpLearn); if (!l) return;
+        l.progressPct = Math.min(100, Number(l.progressPct) + 10); l.updatedAt = new Date().toISOString(); persistData();
       });
     });
     main.querySelectorAll('[data-bump-book]').forEach(btn => {
       btn.addEventListener('click', () => {
-        const b = state.data.books.find(x => x.id === btn.dataset.bumpBook);
-        if (!b) return;
+        const b = state.data.books.find(x => x.id === btn.dataset.bumpBook); if (!b) return;
         b.progressPct = Math.min(100, Number(b.progressPct || 0) + 20);
         if (b.progressPct === 100) { b.status = '已讀完'; if (!b.finishedDate) b.finishedDate = todayStr(0); }
         else if (b.status === '想讀') b.status = '閱讀中';
-        b.updatedAt = new Date().toISOString();
-        persistData();
+        b.updatedAt = new Date().toISOString(); persistData();
         showToast(b.progressPct === 100 ? `恭喜完讀《${b.title}》！` : `進度更新為 ${b.progressPct}%`);
       });
     });
     main.querySelectorAll('[data-book-to-todo]').forEach(btn => {
       btn.addEventListener('click', () => {
-        const b = state.data.books.find(x => x.id === btn.dataset.bookToTodo);
-        if (!b) return;
-        state.data.todos.unshift({
-          id: uid('t'), title: `[閱讀實踐] 《${b.title}》：${(b.oneLiner || b.takeaways || '落實書中重點').slice(0, 42)}`,
-          category: '行動待辦', dueDate: todayStr(3), done: false, repeat: 'none',
-          sourceIdeaId: '', tags: [...new Set(['閱讀', ...(b.tags || [])])], updatedAt: new Date().toISOString()
-        });
-        persistData();
-        showToast('已將書籍心得轉為待辦任務');
+        const b = state.data.books.find(x => x.id === btn.dataset.bookToTodo); if (!b) return;
+        state.data.todos.unshift({ id: uid('t'), title: `[閱讀實踐] 《${b.title}》：${(b.oneLiner || b.takeaways || '落實書中重點').slice(0, 42)}`, category: '行動待辦', dueDate: todayStr(3), done: false, repeat: 'none', sourceIdeaId: '', tags: [...new Set(['閱讀', ...(b.tags || [])])], updatedAt: new Date().toISOString() });
+        persistData(); showToast('已將書籍心得轉為待辦任務');
       });
     });
     main.querySelectorAll('[data-book-to-snippet]').forEach(btn => {
       btn.addEventListener('click', () => {
-        const b = state.data.books.find(x => x.id === btn.dataset.bookToSnippet);
-        if (!b) return;
-        state.data.snippets.unshift({
-          id: uid('s'), title: `《${b.title}》金句摘錄`, category: '常用片段',
-          content: [b.oneLiner, b.quotes].filter(Boolean).join('\n') || b.takeaways || b.title,
-          url: '', tags: [...new Set(['閱讀', ...(b.tags || [])])], updatedAt: new Date().toISOString()
-        });
-        persistData();
-        showToast('已收入常用片段庫');
+        const b = state.data.books.find(x => x.id === btn.dataset.bookToSnippet); if (!b) return;
+        state.data.snippets.unshift({ id: uid('s'), title: `《${b.title}》金句摘錄`, category: '常用片段', content: [b.oneLiner, b.quotes].filter(Boolean).join('\n') || b.takeaways || b.title, url: '', tags: [...new Set(['閱讀', ...(b.tags || [])])], updatedAt: new Date().toISOString() });
+        persistData(); showToast('已收入常用片段庫');
       });
     });
-    main.querySelectorAll('[data-md-book]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const b = state.data.books.find(x => x.id === btn.dataset.mdBook);
-        if (!b) return;
-        const md = `# 《${b.title}》閱讀心得\n\n- 作者：${b.author || '未填'}\n- 分類：${b.category || '未分類'}\n- 狀態：${b.status}（${b.progressPct}%）\n- 評分：${'★'.repeat(b.rating || 5)}\n- 完讀日期：${b.finishedDate || '進行中'}\n- 標籤：${(b.tags || []).map(t => '#' + t).join(' ')}\n\n## 一句話核心收穫\n${b.oneLiner || '無'}\n\n## 重點心得與行動轉化\n${b.takeaways || '無'}\n\n## 書中金句摘錄\n${b.quotes || '無'}\n`;
-        downloadTextFile(`book_${b.title.replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g, '_')}.md`, md);
-        showToast('已匯出書籍心得 Markdown');
-      });
-    });
-
-    // Learning range slider readout
-    const learnRange = document.getElementById('learnRange');
-    if (learnRange) {
-      learnRange.addEventListener('input', () => {
-        document.getElementById('learnRangeVal').textContent = `${learnRange.value}%`;
-      });
-    }
-
-    // Forms
-    const formDiary = document.getElementById('formDiary');
-    if (formDiary) {
-      formDiary.addEventListener('submit', e => {
-        e.preventDefault();
-        const fd = new FormData(formDiary);
-        state.data.diaryEntries.unshift({
-          id: uid('d'), date: fd.get('date'), mood: Number(fd.get('mood')),
-          habits: fd.getAll('habit'), content: String(fd.get('content')).trim(),
-          tags: parseTags(fd.get('tags')), attachment: state.pendingDiaryAttachment,
-          updatedAt: new Date().toISOString()
-        });
-        state.pendingDiaryAttachment = null;
-        persistData();
-        showToast('已儲存今日日記');
-      });
-    }
-
-    const formIdea = document.getElementById('formIdea');
-    if (formIdea) {
-      formIdea.addEventListener('submit', e => {
-        e.preventDefault();
-        const fd = new FormData(formIdea);
-        state.data.ideas.unshift({
-          id: uid('i'), title: String(fd.get('title')).trim(), notes: String(fd.get('notes')).trim(),
-          status: '萌芽', priority: fd.get('priority'), tags: parseTags(fd.get('tags')),
-          linkedTodoId: '', updatedAt: new Date().toISOString()
-        });
-        persistData();
-        showToast('已加入創意想法區');
-      });
-    }
-
-    const formLearning = document.getElementById('formLearning');
-    if (formLearning) {
-      formLearning.addEventListener('submit', e => {
-        e.preventDefault();
-        const fd = new FormData(formLearning);
-        state.data.learningLogs.unshift({
-          id: uid('l'), topic: String(fd.get('topic')).trim(),
-          progressPct: Number(fd.get('progressPct')), minutesSpent: Number(fd.get('minutesSpent') || 0),
-          milestone: String(fd.get('milestone')).trim(), resourceUrl: '',
-          date: todayStr(0), tags: parseTags(fd.get('tags')), updatedAt: new Date().toISOString()
-        });
-        persistData();
-        showToast('已更新學習狀態並關聯今日日記');
-      });
-    }
-
-    const formTodo = document.getElementById('formTodo');
-    if (formTodo) {
-      formTodo.addEventListener('submit', e => {
-        e.preventDefault();
-        const fd = new FormData(formTodo);
-        state.data.todos.unshift({
-          id: uid('t'), title: String(fd.get('title')).trim(), category: fd.get('category'),
-          dueDate: fd.get('dueDate'), done: false, repeat: fd.get('repeat'),
-          sourceIdeaId: '', tags: parseTags(fd.get('tags')), updatedAt: new Date().toISOString()
-        });
-        persistData();
-        showToast('已新增待辦項目');
-      });
-    }
-
-    const formVault = document.getElementById('formVault');
-    if (formVault) {
-      formVault.addEventListener('submit', e => {
-        e.preventDefault();
-        const fd = new FormData(formVault);
-        state.data.accountHints.unshift({
-          id: uid('v'), serviceName: String(fd.get('serviceName')).trim(),
-          loginEmail: String(fd.get('loginEmail')).trim(), authType: fd.get('authType'),
-          bitwardenFolder: String(fd.get('bitwardenFolder')).trim(),
-          renewalDate: fd.get('renewalDate'), notes: String(fd.get('notes')).trim(),
-          tags: parseTags(fd.get('tags')), updatedAt: new Date().toISOString()
-        });
-        persistData();
-        showToast('已儲存帳號提示索引');
-      });
-    }
-
-    const formSnippet = document.getElementById('formSnippet');
-    if (formSnippet) {
-      formSnippet.addEventListener('submit', e => {
-        e.preventDefault();
-        const fd = new FormData(formSnippet);
-        state.data.snippets.unshift({
-          id: uid('s'), title: String(fd.get('title')).trim(), category: fd.get('category'),
-          content: String(fd.get('content')).trim(), url: String(fd.get('url')).trim(),
-          tags: parseTags(fd.get('tags')), updatedAt: new Date().toISOString()
-        });
-        persistData();
-        showToast('已收入常用片段與書籤庫');
-      });
-    }
-
-    // Idea -> Todo promotion
-    main.querySelectorAll('[data-promote-idea]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const idea = state.data.ideas.find(x => x.id === btn.dataset.promoteIdea);
-        if (!idea) return;
-        const tid = uid('t');
-        state.data.todos.unshift({
-          id: tid, title: `[靈感落地] ${idea.title}`, category: '行動待辦',
-          dueDate: todayStr(3), done: false, repeat: 'none',
-          sourceIdeaId: idea.id, tags: [...(idea.tags || [])], updatedAt: new Date().toISOString()
-        });
-        idea.linkedTodoId = tid;
-        idea.status = '評估中';
-        idea.updatedAt = new Date().toISOString();
-        persistData();
-        showToast('已一鍵轉為待辦任務');
-      });
-    });
-
-    // Learning +10%
-    main.querySelectorAll('[data-bump-learn]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const log = state.data.learningLogs.find(x => x.id === btn.dataset.bumpLearn);
-        if (!log) return;
-        log.progressPct = Math.min(100, Number(log.progressPct) + 10);
-        log.updatedAt = new Date().toISOString();
-        persistData();
-      });
-    });
-
-    // Todo toggle (Recurring + Linked Idea)
     main.querySelectorAll('[data-toggle-todo]').forEach(chk => {
       chk.addEventListener('change', () => {
-        const todo = state.data.todos.find(x => x.id === chk.dataset.toggleTodo);
-        if (!todo) return;
-        todo.done = chk.checked;
-        todo.updatedAt = new Date().toISOString();
+        const todo = state.data.todos.find(x => x.id === chk.dataset.toggleTodo); if (!todo) return;
+        todo.done = chk.checked; todo.updatedAt = new Date().toISOString();
         if (todo.done && todo.sourceIdeaId) {
           const idea = state.data.ideas.find(x => x.id === todo.sourceIdeaId);
           if (idea) { idea.status = '已落地'; idea.updatedAt = new Date().toISOString(); }
@@ -2153,111 +1993,80 @@
         persistData();
       });
     });
-
-    // Todo snooze +1 day & move to weekend
     main.querySelectorAll('[data-snooze-todo]').forEach(btn => {
       btn.addEventListener('click', () => {
-        const todo = state.data.todos.find(x => x.id === btn.dataset.snoozeTodo);
-        if (!todo) return;
-        const base = todo.dueDate ? new Date(todo.dueDate) : new Date();
-        base.setDate(base.getDate() + 1);
-        todo.dueDate = base.toISOString().slice(0, 10);
-        todo.updatedAt = new Date().toISOString();
-        persistData();
-        showToast(`已順延至 ${todo.dueDate}`);
+        const t = state.data.todos.find(x => x.id === btn.dataset.snoozeTodo); if (!t) return;
+        const base = t.dueDate ? new Date(t.dueDate) : new Date(); base.setDate(base.getDate() + 1);
+        t.dueDate = base.toISOString().slice(0, 10); t.updatedAt = new Date().toISOString(); persistData();
+        showToast(`已順延至 ${t.dueDate}`);
       });
     });
     main.querySelectorAll('[data-weekend-todo]').forEach(btn => {
       btn.addEventListener('click', () => {
-        const todo = state.data.todos.find(x => x.id === btn.dataset.weekendTodo);
-        if (!todo) return;
-        todo.dueDate = nextWeekendStr();
-        todo.updatedAt = new Date().toISOString();
-        persistData();
-        showToast(`已移至週末（${todo.dueDate}）`);
+        const t = state.data.todos.find(x => x.id === btn.dataset.weekendTodo); if (!t) return;
+        t.dueDate = nextWeekendStr(); t.updatedAt = new Date().toISOString(); persistData();
+        showToast(`已移至週末（${t.dueDate}）`);
       });
     });
 
-    // Copy snippet
-    main.querySelectorAll('[data-copy-snippet]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const s = state.data.snippets.find(x => x.id === btn.dataset.copySnippet);
-        if (s) copyText(s.content || s.url || s.title, '已複製片段內容');
-      });
+    // Copy & Markdown exports
+    main.querySelectorAll('[data-copy-snippet]').forEach(btn => btn.addEventListener('click', () => { const s = state.data.snippets.find(x => x.id === btn.dataset.copySnippet); if (s) copyText(s.content || s.url || s.title, '已複製片段內容'); }));
+    main.querySelectorAll('[data-copy-url]').forEach(btn => btn.addEventListener('click', () => copyText(btn.dataset.copyUrl, '已複製網址')));
+    main.querySelectorAll('[data-md-diary]').forEach(btn => btn.addEventListener('click', () => {
+      const e = state.data.diaryEntries.find(x => x.id === btn.dataset.mdDiary); if (!e) return;
+      downloadTextFile(`diary_${e.date}.md`, `# 日記 ${e.date}\n\n- 類別：${e.category || '日常生活'}\n- 心情：${e.mood}/5\n- 習慣：${(e.habits || []).join('、') || '無'}\n\n${e.content}\n`);
+      showToast('已匯出日記 Markdown');
+    }));
+    main.querySelectorAll('[data-md-learn]').forEach(btn => btn.addEventListener('click', () => {
+      const l = state.data.learningLogs.find(x => x.id === btn.dataset.mdLearn); if (!l) return;
+      downloadTextFile(`learning_${l.date}.md`, `# 學習筆記：${l.topic}\n\n- 類別：${l.category || '程式技術'}\n- 完成度：${l.progressPct}%\n- 投入：${l.minutesSpent} 分鐘\n\n${l.milestone || ''}\n`);
+      showToast('已匯出學習筆記 Markdown');
+    }));
+    main.querySelectorAll('[data-md-book]').forEach(btn => btn.addEventListener('click', () => {
+      const b = state.data.books.find(x => x.id === btn.dataset.mdBook); if (!b) return;
+      downloadTextFile(`book_${b.title.replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g, '_')}.md`, `# 《${b.title}》閱讀心得\n\n- 作者：${b.author || '未填'}\n- 分類：${b.category || '未分類'}\n- 狀態：${b.status}（${b.progressPct}%）\n- 評分：${'★'.repeat(b.rating || 5)}\n\n## 一句話核心收穫\n${b.oneLiner || '無'}\n\n## 重點心得\n${b.takeaways || '無'}\n\n## 書中金句\n${b.quotes || '無'}\n`);
+      showToast('已匯出書籍心得 Markdown');
+    }));
+    const btnExportHubMd = document.getElementById('btnExportHubMd');
+    if (btnExportHubMd) btnExportHubMd.addEventListener('click', () => {
+      const tag = state.selectedHubTag, hasTag = x => (x.tags || []).includes(tag);
+      const md = [
+        `# 專案總覽：#${tag}`, '',
+        '## 待辦任務', ...state.data.todos.filter(hasTag).map(t => `- [${t.done ? 'x' : ' '}] ${t.title}`), '',
+        '## 學習與書籍', ...state.data.learningLogs.filter(hasTag).map(l => `- [學習] ${l.topic} (${l.progressPct}%)`), ...state.data.books.filter(hasTag).map(b => `- [書籍] 《${b.title}》：${b.oneLiner}`), '',
+        '## 相關網頁', ...state.data.bookmarks.filter(hasTag).map(b => `- [${b.title}](${b.url})`)
+      ].join('\n');
+      downloadTextFile(`project_${tag}.md`, md);
+      showToast(`已匯出 #${tag} 專案 Markdown`);
     });
 
-    // Soft Delete & Trash actions
-    main.querySelectorAll('[data-del]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const [col, id] = btn.dataset.del.split(':');
-        softDeleteItem(col, id);
-      });
-    });
-    main.querySelectorAll('[data-restore-trash]').forEach(btn => {
-      btn.addEventListener('click', () => restoreTrashItem(btn.dataset.restoreTrash));
-    });
-    main.querySelectorAll('[data-purge-trash]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        state.data.trash = state.data.trash.filter(x => x.id !== btn.dataset.purgeTrash);
-        persistData();
-        showToast('已永久刪除');
-      });
-    });
+    // Soft Delete, Trash, Jumps
+    main.querySelectorAll('[data-del]').forEach(btn => btn.addEventListener('click', () => { const [col, id] = btn.dataset.del.split(':'); softDeleteItem(col, id); }));
+    main.querySelectorAll('[data-restore-trash]').forEach(btn => btn.addEventListener('click', () => restoreTrashItem(btn.dataset.restoreTrash)));
+    main.querySelectorAll('[data-purge-trash]').forEach(btn => btn.addEventListener('click', () => { state.data.trash = state.data.trash.filter(x => x.id !== btn.dataset.purgeTrash); persistData(); showToast('已永久刪除'); }));
     const btnEmptyTrash = document.getElementById('btnEmptyTrash');
-    if (btnEmptyTrash) {
-      btnEmptyTrash.addEventListener('click', () => {
-        state.data.trash = [];
-        persistData();
-        showToast('已清空回收桶');
-      });
-    }
-
-    // Jump tabs & Hub tags
-    main.querySelectorAll('[data-jump-tab]').forEach(btn => {
-      btn.addEventListener('click', () => { state.activeTab = btn.dataset.jumpTab; renderAll(); });
-    });
-    main.querySelectorAll('[data-hub-tag]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        state.selectedHubTag = btn.dataset.hubTag;
-        state.activeTab = 'hub';
-        renderAll();
-      });
-    });
+    if (btnEmptyTrash) btnEmptyTrash.addEventListener('click', () => { state.data.trash = []; persistData(); showToast('已清空回收桶'); });
+    main.querySelectorAll('[data-jump-tab]').forEach(btn => btn.addEventListener('click', () => { state.activeTab = btn.dataset.jumpTab; state.editing = { tab: '', id: '' }; renderAll(); }));
+    main.querySelectorAll('[data-hub-tag]').forEach(btn => btn.addEventListener('click', () => { state.selectedHubTag = btn.dataset.hubTag; state.activeTab = 'hub'; renderAll(); }));
   }
 
   // ==================== MODALS ====================
-  function openModal(html) {
-    document.getElementById('modalBox').innerHTML = html;
-    document.getElementById('modalBackdrop').classList.remove('hidden');
-  }
-  function closeModal() {
-    document.getElementById('modalBackdrop').classList.add('hidden');
-  }
+  function openModal(html) { document.getElementById('modalBox').innerHTML = html; document.getElementById('modalBackdrop').classList.remove('hidden'); }
+  function closeModal() { document.getElementById('modalBackdrop').classList.add('hidden'); }
 
   function openOAuthConfigModal() {
     openModal(`
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="text-[22px] font-bold">設定 Google OAuth Client ID</h3>
-        <button id="btnCloseModal" type="button" class="text-slate-400 hover:text-slate-700 text-2xl leading-none">×</button>
-      </div>
-      <p class="text-[16px] text-[#525B66] mb-4">
-        部署到 GitHub Pages 後，到 Google Cloud Console 啟用 <strong>Google Drive API</strong>，建立網頁應用程式 OAuth Client ID，將你的 GitHub Pages 網址加入「已授權的 JavaScript 來源」，並將同意畫面設為 <strong>Testing（測試中）</strong>且僅將自己的 Gmail 加入 Test users 白名單。
-      </p>
+      <div class="flex items-center justify-between mb-4"><h3 class="text-[22px] font-bold">設定 Google OAuth Client ID</h3><button id="btnCloseModal" type="button" class="text-slate-400 hover:text-slate-700 text-2xl leading-none">×</button></div>
+      <p class="text-[16px] text-[#525B66] mb-4">在 Google Cloud Console 啟用 <strong>Google Drive API</strong>，建立 Web application OAuth Client ID，將你的 GitHub Pages 網域加入「已授權的 JavaScript 來源」，並把同意畫面維持在 <strong>Testing</strong> 且只加自己 Gmail 為 Test user。</p>
       <label class="block text-[15px] font-semibold mb-1.5">Google OAuth Client ID</label>
       <input id="inputClientId" type="text" value="${esc(state.clientId)}" placeholder="xxxx.apps.googleusercontent.com" class="w-full mono px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[15px] mb-5">
-      <div class="flex justify-end gap-2.5">
-        <button id="btnCancelModal" type="button" class="btn-pill-soft px-5 py-2 text-[16px]">取消</button>
-        <button id="btnSaveClientId" type="button" class="btn-pill-orange px-6 py-2 text-[16px]">儲存設定</button>
-      </div>
+      <div class="flex justify-end gap-2.5"><button id="btnCancelModal" type="button" class="btn-pill-soft px-5 py-2 text-[16px]">取消</button><button id="btnSaveClientId" type="button" class="btn-pill-orange px-6 py-2 text-[16px]">儲存設定</button></div>
     `);
     document.getElementById('btnCloseModal').addEventListener('click', closeModal);
     document.getElementById('btnCancelModal').addEventListener('click', closeModal);
     document.getElementById('btnSaveClientId').addEventListener('click', () => {
       state.clientId = document.getElementById('inputClientId').value.trim();
-      safeSet(STORAGE_CLIENT_ID_KEY, state.clientId);
-      updateOAuthBadge();
-      closeModal();
-      showToast('已儲存 OAuth Client ID');
+      safeSet(STORAGE_CLIENT_ID_KEY, state.clientId); updateOAuthBadge(); closeModal(); showToast('已儲存 OAuth Client ID');
     });
   }
 
@@ -2266,76 +2075,39 @@
       const cutoff = todayStr(-days);
       const diaries = state.data.diaryEntries.filter(d => days === 9999 || d.date >= cutoff);
       const learns = state.data.learningLogs.filter(l => days === 9999 || l.date >= cutoff);
-      const openTodos = state.data.todos.filter(t => !t.done);
-      const activeIdeas = state.data.ideas.filter(i => i.status !== '封存');
       return [
-        `# 個人復盤摘要（近 ${days === 9999 ? '全部' : days + ' 天'}）`,
-        '',
-        '## 1. 每日日記',
-        ...diaries.map(d => `- [${d.date}] 心情 ${d.mood}/5｜習慣：${(d.habits || []).join('、') || '無'}｜${d.content}`),
-        '',
-        '## 2. 學習進度',
-        ...learns.map(l => `- ${l.topic}（${l.progressPct}%・${l.minutesSpent}分鐘）：${l.milestone}`),
-        '',
-        '## 3. 進行中的 Idea',
-        ...activeIdeas.map(i => `- [${i.status}/${i.priority}] ${i.title}：${i.notes}`),
-        '',
-        '## 4. 近期閱讀書籍與重點心得',
-        ...state.data.books.map(b => `- [${b.category}/${b.status}] 《${b.title}》：${b.oneLiner || b.takeaways || '無'}`),
-        '',
-        '## 5. 待完成事項',
-        ...openTodos.map(t => `- [${t.category}] ${t.title}（期限：${t.dueDate || '未定'}）`),
-        '',
-        '---',
-        '請幫我根據以上紀錄：1) 總結本階段亮點與進展 2) 指出時間或注意力瓶頸 3) 建議接下來最優先推進的 3 件具體行動。'
+        `# 個人復盤摘要（近 ${days === 9999 ? '全部' : days + ' 天'}）`, '',
+        '## 1. 每日日記', ...diaries.map(d => `- [${d.date}/${d.category || '日常'}] 心情 ${d.mood}/5｜${d.content}`), '',
+        '## 2. 學習進度', ...learns.map(l => `- [${l.category || '學習'}] ${l.topic}（${l.progressPct}%・${l.minutesSpent}m）：${l.milestone}`), '',
+        '## 3. 近期閱讀書籍與重點心得', ...state.data.books.map(b => `- [${b.category}/${b.status}] 《${b.title}》：${b.oneLiner || b.takeaways || '無'}`), '',
+        '## 4. 進行中的 Idea', ...state.data.ideas.filter(i => i.status !== '封存').map(i => `- [${i.category || '點子'}/${i.status}] ${i.title}：${i.notes}`), '',
+        '## 5. 待完成事項', ...state.data.todos.filter(t => !t.done).map(t => `- [${t.category}] ${t.title}（期限：${t.dueDate || '未定'}）`), '',
+        '---', '請幫我根據以上紀錄：1) 總結亮點與進展 2) 指出時間或注意力瓶頸 3) 建議接下來最優先推進的 3 件具體行動。'
       ].join('\n');
     };
-
     openModal(`
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="text-[22px] font-bold">AI 復盤專用一鍵複製</h3>
-        <button id="btnCloseModal" type="button" class="text-slate-400 hover:text-slate-700 text-2xl leading-none">×</button>
-      </div>
+      <div class="flex items-center justify-between mb-4"><h3 class="text-[22px] font-bold">AI 復盤專用一鍵複製</h3><button id="btnCloseModal" type="button" class="text-slate-400 hover:text-slate-700 text-2xl leading-none">×</button></div>
       <div class="flex gap-2 mb-3">
         <button type="button" data-ai-days="7" class="btn-pill-soft px-4 py-1.5 text-[15px]">近 7 天</button>
         <button type="button" data-ai-days="30" class="btn-pill-soft px-4 py-1.5 text-[15px]">近 30 天</button>
         <button type="button" data-ai-days="9999" class="btn-pill-soft px-4 py-1.5 text-[15px]">全部資料</button>
       </div>
       <textarea id="aiExportText" rows="12" class="w-full mono text-[14px] p-4 rounded-2xl bg-slate-50 border border-slate-200 mb-4">${esc(buildSummary(7))}</textarea>
-      <div class="flex justify-end gap-2.5">
-        <button id="btnCancelModal" type="button" class="btn-pill-soft px-5 py-2 text-[16px]">關閉</button>
-        <button id="btnCopyAi" type="button" class="btn-pill-orange px-6 py-2 text-[16px]">一鍵複製貼給 AI</button>
-      </div>
+      <div class="flex justify-end gap-2.5"><button id="btnCancelModal" type="button" class="btn-pill-soft px-5 py-2 text-[16px]">關閉</button><button id="btnCopyAi" type="button" class="btn-pill-orange px-6 py-2 text-[16px]">一鍵複製貼給 AI</button></div>
     `);
     document.getElementById('btnCloseModal').addEventListener('click', closeModal);
     document.getElementById('btnCancelModal').addEventListener('click', closeModal);
-    document.querySelectorAll('[data-ai-days]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.getElementById('aiExportText').value = buildSummary(Number(btn.dataset.aiDays));
-      });
-    });
-    document.getElementById('btnCopyAi').addEventListener('click', () => {
-      copyText(document.getElementById('aiExportText').value, '已複製復盤摘要，可直接貼給 AI！');
-    });
+    document.querySelectorAll('[data-ai-days]').forEach(btn => btn.addEventListener('click', () => { document.getElementById('aiExportText').value = buildSummary(Number(btn.dataset.aiDays)); }));
+    document.getElementById('btnCopyAi').addEventListener('click', () => copyText(document.getElementById('aiExportText').value, '已複製復盤摘要，可直接貼給 AI！'));
   }
 
   function openSettingsModal() {
     openModal(`
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="text-[22px] font-bold">資料備份、閒置鎖定與 Drive 設定</h3>
-        <button id="btnCloseModal" type="button" class="text-slate-400 hover:text-slate-700 text-2xl leading-none">×</button>
-      </div>
+      <div class="flex items-center justify-between mb-4"><h3 class="text-[22px] font-bold">資料備份、閒置鎖定與 Drive 設定</h3><button id="btnCloseModal" type="button" class="text-slate-400 hover:text-slate-700 text-2xl leading-none">×</button></div>
       <div class="space-y-4 text-[16px]">
-        ${state.lastSyncError ? `
-        <div class="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-800 text-[14px]">
-          <div class="font-bold mb-1">最近一次同步錯誤訊息：</div>
-          <div class="mono break-all">${esc(state.lastSyncError)}</div>
-        </div>` : ''}
+        ${state.lastSyncError ? `<div class="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-800 text-[14px]"><div class="font-bold mb-1">最近一次同步錯誤訊息：</div><div class="mono break-all">${esc(state.lastSyncError)}</div></div>` : ''}
         <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div class="font-bold">閒置自動鎖屏（防離座偷窺）</div>
-            <div class="text-[14px] text-slate-500">超過設定時間無操作，自動鎖定返回登入頁。</div>
-          </div>
+          <div><div class="font-bold">閒置自動鎖屏</div><div class="text-[14px] text-slate-500">超過設定時間無操作，自動返回登入頁。</div></div>
           <select id="selectIdleLock" class="px-4 py-2 rounded-full bg-white border border-slate-200 text-[15px] font-semibold">
             <option value="0" ${state.idleLockMinutes === 0 ? 'selected' : ''}>關閉</option>
             <option value="5" ${state.idleLockMinutes === 5 ? 'selected' : ''}>5 分鐘</option>
@@ -2344,33 +2116,19 @@
           </select>
         </div>
         <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div class="font-bold">匯出完整 JSON 備份</div>
-            <div class="text-[14px] text-slate-500">隨時下載單一 JSON 檔案，換任何電腦或雲端皆可還原。</div>
-          </div>
+          <div><div class="font-bold">匯出完整 JSON 備份</div><div class="text-[14px] text-slate-500">隨時下載單一 JSON 檔案，換任何電腦皆可還原。</div></div>
           <button id="btnExportJson" type="button" class="btn-pill-orange px-5 py-2 text-[15px]">下載 JSON</button>
         </div>
         <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div class="font-bold">匯入 JSON 還原資料</div>
-            <div class="text-[14px] text-slate-500">選擇先前匯出的 notebook_data.json 檔案。</div>
-          </div>
-          <label class="btn-pill-soft px-5 py-2 text-[15px] cursor-pointer">
-            選擇檔案<input id="inputImportJson" type="file" accept=".json" class="hidden">
-          </label>
+          <div><div class="font-bold">匯入 JSON 還原資料</div><div class="text-[14px] text-slate-500">選擇先前匯出的 notebook_data.json 檔案。</div></div>
+          <label class="btn-pill-soft px-5 py-2 text-[15px] cursor-pointer">選擇檔案<input id="inputImportJson" type="file" accept=".json" class="hidden"></label>
         </div>
         <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div class="font-bold">Google OAuth Client ID</div>
-            <div class="text-[14px] text-slate-500 mono">${esc(state.clientId || '尚未設定')}</div>
-          </div>
+          <div><div class="font-bold">Google OAuth Client ID</div><div class="text-[14px] text-slate-500 mono">${esc(state.clientId || '尚未設定')}</div></div>
           <button id="btnEditOAuthInSettings" type="button" class="btn-pill-soft px-5 py-2 text-[15px]">修改</button>
         </div>
         <div class="p-4 rounded-2xl bg-red-50/70 border border-red-200 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div class="font-bold text-red-700">清空本機快取並鎖定（共用電腦防護）</div>
-            <div class="text-[14px] text-red-600">登出並移除瀏覽器內暫存資料，不影響 Google Drive 雲端檔案。</div>
-          </div>
+          <div><div class="font-bold text-red-700">清空本機快取並鎖定</div><div class="text-[14px] text-red-600">登出並移除瀏覽器暫存，不影響 Google Drive 雲端檔案。</div></div>
           <button id="btnWipeAndLock" type="button" class="px-5 py-2 rounded-full bg-red-600 text-white font-semibold text-[15px]">清空並登出</button>
         </div>
       </div>
@@ -2378,49 +2136,27 @@
     document.getElementById('btnCloseModal').addEventListener('click', closeModal);
     document.getElementById('btnEditOAuthInSettings').addEventListener('click', openOAuthConfigModal);
     document.getElementById('selectIdleLock').addEventListener('change', e => {
-      state.idleLockMinutes = Number(e.target.value);
-      safeSet(STORAGE_IDLE_KEY, state.idleLockMinutes);
-      resetIdleTimer();
+      state.idleLockMinutes = Number(e.target.value); safeSet(STORAGE_IDLE_KEY, state.idleLockMinutes); resetIdleTimer();
       showToast(state.idleLockMinutes ? `已設定閒置 ${state.idleLockMinutes} 分鐘自動鎖屏` : '已關閉自動鎖屏');
     });
-    document.getElementById('btnExportJson').addEventListener('click', () => {
-      downloadTextFile(`notebook_data_${todayStr(0)}.json`, JSON.stringify(state.data, null, 2), 'application/json');
-      showToast('已匯出 JSON 備份');
-    });
+    document.getElementById('btnExportJson').addEventListener('click', () => { downloadTextFile(`notebook_data_${todayStr(0)}.json`, JSON.stringify(state.data, null, 2), 'application/json'); showToast('已匯出 JSON 備份'); });
     document.getElementById('inputImportJson').addEventListener('change', e => {
-      const file = e.target.files?.[0];
-      if (!file) return;
+      const file = e.target.files?.[0]; if (!file) return;
       const reader = new FileReader();
       reader.onload = () => {
-        try {
-          const parsed = JSON.parse(String(reader.result));
-          if (!parsed.diaryEntries || !parsed.todos) throw new Error('invalid');
-          state.data = ensureDataShape(parsed);
-          persistData();
-          closeModal();
-          showToast('已成功匯入 JSON 資料');
-        } catch { showToast('JSON 格式不正確，請確認檔案'); }
+        try { const parsed = JSON.parse(String(reader.result)); if (!parsed.diaryEntries || !parsed.todos) throw new Error('invalid'); state.data = ensureDataShape(parsed); persistData(); closeModal(); showToast('已成功匯入 JSON 資料'); }
+        catch { showToast('JSON 格式不正確'); }
       };
       reader.readAsText(file);
     });
-    document.getElementById('btnWipeAndLock').addEventListener('click', () => {
-      safeRemove(STORAGE_DATA_KEY);
-      closeModal();
-      lockWorkspace('已清空本機快取並鎖定');
-    });
+    document.getElementById('btnWipeAndLock').addEventListener('click', () => { safeRemove(STORAGE_DATA_KEY); closeModal(); lockWorkspace('已清空本機快取並鎖定'); });
   }
 
   // ==================== APP LIFECYCLE ====================
   function updateOAuthBadge() {
-    const b = document.getElementById('oauthStatusBadge');
-    if (!b) return;
-    if (state.clientId) {
-      b.textContent = '已設定 Client ID';
-      b.className = 'mono text-[14px] px-3 py-1 rounded-full bg-emerald-50 text-emerald-700';
-    } else {
-      b.textContent = '未設定 Client ID';
-      b.className = 'mono text-[14px] px-3 py-1 rounded-full bg-slate-100 text-slate-700';
-    }
+    const b = document.getElementById('oauthStatusBadge'); if (!b) return;
+    if (state.clientId) { b.textContent = '已設定 Client ID'; b.className = 'mono text-[14px] px-3 py-1 rounded-full bg-emerald-50 text-emerald-700'; }
+    else { b.textContent = '未設定 Client ID'; b.className = 'mono text-[14px] px-3 py-1 rounded-full bg-slate-100 text-slate-700'; }
   }
 
   function enterWorkspace() {
@@ -2439,112 +2175,51 @@
     updateOAuthBadge();
 
     document.getElementById('btnGoogleLogin').addEventListener('click', startGoogleLogin);
-    document.getElementById('btnDemoLogin').addEventListener('click', () => {
-      state.mode = 'local';
-      enterWorkspace();
-      showToast('已進入本機試用模式（完整功能已啟用）');
-    });
+    document.getElementById('btnDemoLogin').addEventListener('click', () => { state.mode = 'local'; enterWorkspace(); showToast('已進入本機試用模式（v4 全模組分類・編輯・分頁已啟用）'); });
     document.getElementById('btnOpenOAuthConfig').addEventListener('click', openOAuthConfigModal);
     document.getElementById('btnOpenAiExport').addEventListener('click', openAiExportModal);
     document.getElementById('btnOpenSettings').addEventListener('click', openSettingsModal);
     document.getElementById('btnSyncNow').addEventListener('click', () => syncWithGoogleDrive(true));
     document.getElementById('btnPrivacyToggle').addEventListener('click', () => {
-      state.privacyBlur = !state.privacyBlur;
-      document.body.classList.toggle('privacy-blur', state.privacyBlur);
-      showToast(state.privacyBlur ? '已開啟防窺模糊模式（滑鼠移過即顯示）' : '已關閉防窺模糊模式');
+      state.privacyBlur = !state.privacyBlur; document.body.classList.toggle('privacy-blur', state.privacyBlur);
+      showToast(state.privacyBlur ? '已開啟防窺模糊模式' : '已關閉防窺模糊模式');
     });
     document.getElementById('btnLogout').addEventListener('click', () => lockWorkspace());
-
-    document.getElementById('btnMobileMenu').addEventListener('click', () => {
-      document.getElementById('sidebarNav').classList.toggle('hidden');
-    });
-
+    document.getElementById('btnMobileMenu').addEventListener('click', () => document.getElementById('sidebarNav').classList.toggle('hidden'));
     document.querySelectorAll('.nav-item').forEach(btn => {
       btn.addEventListener('click', () => {
         state.activeTab = btn.dataset.tab;
+        state.editing = { tab: '', id: '' };
         if (window.innerWidth < 1024) document.getElementById('sidebarNav').classList.add('hidden');
         renderAll();
       });
     });
-
     document.getElementById('sidebarTags').addEventListener('click', e => {
-      const btn = e.target.closest('[data-hub-tag]');
-      if (!btn) return;
-      state.selectedHubTag = btn.dataset.hubTag;
-      state.activeTab = 'hub';
-      renderAll();
+      const btn = e.target.closest('[data-hub-tag]'); if (!btn) return;
+      state.selectedHubTag = btn.dataset.hubTag; state.activeTab = 'hub'; renderAll();
     });
-
     document.getElementById('globalSearchInput').addEventListener('input', e => {
       state.searchQuery = e.target.value;
+      Object.keys(state.pages).forEach(k => { state.pages[k] = 1; });
       if (state.activeTab === 'dashboard' && state.searchQuery.trim()) state.activeTab = 'diary';
       renderAll();
     });
-
-    document.getElementById('btnQuickVoice').addEventListener('click', () => {
-      toggleVoiceInput(document.getElementById('quickCaptureInput'), document.getElementById('btnQuickVoice'));
-    });
-
+    document.getElementById('btnQuickVoice').addEventListener('click', () => toggleVoiceInput(document.getElementById('quickCaptureInput'), document.getElementById('btnQuickVoice')));
     document.getElementById('btnQuickCapture').addEventListener('click', () => {
       const type = document.getElementById('quickCaptureType').value;
       const input = document.getElementById('quickCaptureInput');
-      const val = input.value.trim();
-      if (!val) return;
-      if (type === 'inbox') {
-        state.data.inbox.unshift({ id: uid('in'), content: val, url: '', createdAt: todayStr(0), updatedAt: new Date().toISOString() });
-      } else if (type === 'idea') {
-        state.data.ideas.unshift({ id: uid('i'), title: val, notes: '', status: '萌芽', priority: '中', tags: ['快記'], linkedTodoId: '', updatedAt: new Date().toISOString() });
-      } else if (type === 'todo') {
-        state.data.todos.unshift({ id: uid('t'), title: val, category: '行動待辦', dueDate: todayStr(1), done: false, repeat: 'none', sourceIdeaId: '', tags: ['快記'], updatedAt: new Date().toISOString() });
-      } else {
-        state.data.diaryEntries.unshift({ id: uid('d'), date: todayStr(0), mood: 4, habits: ['寫筆記'], content: val, tags: ['快記'], attachment: null, updatedAt: new Date().toISOString() });
-      }
-      input.value = '';
-      persistData();
-      showToast('已快速記下！');
+      const val = input.value.trim(); if (!val) return;
+      if (type === 'inbox') state.data.inbox.unshift({ id: uid('in'), category: '靈感摘錄', content: val, url: '', createdAt: todayStr(0), updatedAt: new Date().toISOString() });
+      else if (type === 'idea') state.data.ideas.unshift({ id: uid('i'), category: '產品點子', title: val, notes: '', status: '萌芽', priority: '中', tags: ['快記'], linkedTodoId: '', updatedAt: new Date().toISOString() });
+      else if (type === 'todo') state.data.todos.unshift({ id: uid('t'), category: '行動待辦', title: val, dueDate: todayStr(1), done: false, repeat: 'none', sourceIdeaId: '', tags: ['快記'], updatedAt: new Date().toISOString() });
+      else state.data.diaryEntries.unshift({ id: uid('d'), category: '日常生活', date: todayStr(0), mood: 4, habits: ['寫筆記'], content: val, tags: ['快記'], attachment: null, updatedAt: new Date().toISOString() });
+      input.value = ''; persistData(); showToast('已快速記下！');
     });
-
-    document.getElementById('modalBackdrop').addEventListener('click', e => {
-      if (e.target.id === 'modalBackdrop') closeModal();
-    });
-  }
-
-
-  // ==================== DAILY AUTO-BACKUP SNAPSHOT (backups/YYYY-MM-DD.json) ====================
-  const STORAGE_LAST_BACKUP_KEY = 'drivenote_last_backup_date';
-  async function ensureDailyDriveBackup() {
-    if (state.mode !== 'google' || !state.accessToken || !state.driveFolderId) return;
-    const today = todayStr(0);
-    if (safeGet(STORAGE_LAST_BACKUP_KEY, '') === today) return;
-    try {
-      const backupFolderId = await ensureDriveFolder('backups', state.driveFolderId);
-      const snapName = `${today}.json`;
-      const q = encodeURIComponent(`name='${snapName}' and '${backupFolderId}' in parents and trashed=false`);
-      const checkRes = await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`);
-      const checkJson = await checkRes.json();
-      if (!checkJson.files || checkJson.files.length === 0) {
-        const cRes = await driveFetch('https://www.googleapis.com/drive/v3/files?fields=id', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: snapName, parents: [backupFolderId], mimeType: 'application/json' })
-        });
-        const cJson = await cRes.json();
-        await driveFetch(`https://www.googleapis.com/upload/drive/v3/files/${cJson.id}?uploadType=media`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(state.data, null, 2)
-        });
-      }
-      safeSet(STORAGE_LAST_BACKUP_KEY, today);
-    } catch {
-      // Non-blocking daily snapshot
-    }
+    document.getElementById('modalBackdrop').addEventListener('click', e => { if (e.target.id === 'modalBackdrop') closeModal(); });
   }
 
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js').catch(() => {});
-    });
+    window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
   }
 
   init();

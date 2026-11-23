@@ -1,4 +1,4 @@
-const CACHE_NAME = 'drivenote-shell-v3';
+const CACHE_NAME = 'drivenote-shell-v4';
 const SHELL_ASSETS = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', (event) => {
