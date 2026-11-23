@@ -231,6 +231,10 @@
             <span>學習狀態與番茄鐘</span>
             <span id="badgeLearning" class="mono text-[13px] text-slate-500">0</span>
           </button>
+          <button type="button" data-tab="classes" class="nav-item w-full text-left px-4 py-2.5 rounded-2xl text-[17px] flex items-center justify-between">
+            <span>上課學習重點</span>
+            <span id="badgeClasses" class="mono text-[13px] text-slate-500">0</span>
+          </button>
           <button type="button" data-tab="books" class="nav-item w-full text-left px-4 py-2.5 rounded-2xl text-[17px] flex items-center justify-between">
             <span>閱讀書庫與心得</span>
             <span id="badgeBooks" class="mono text-[13px] text-slate-500">0</span>
@@ -314,6 +318,7 @@
     diary: ['日常生活', '工作研究', '學習反思', '健康運動', '人際旅行', '其他'],
     ideas: ['產品點子', '內容創作', '研究構想', '工具優化', '生活靈感', '其他'],
     learning: ['程式技術', '學術研究', 'AI 應用', '語言閱讀', '商業思維', '其他'],
+    classes: ['學校課程', '線上課程', '工作坊／講座', 'AI 與技術實作', '專業證照', '語言進修', '其他'],
     books: ['自我成長', '商業理財', '科技與AI', '專業研究', '心理社科', '文學小說', '生活風格', '其他'],
     todos: ['行動待辦', '待補資料', '工作研究', '個人生活', '財務帳務', '其他'],
     bookmarks: ['AI 工具', '開發資源', '論文研究', '設計靈感', '生活消費', '學習平台', '其他'],
@@ -322,7 +327,7 @@
   };
 
   const COLLECTION_LABELS = {
-    inbox: '收件匣', diaryEntries: '日記', ideas: 'Idea', learningLogs: '學習',
+    inbox: '收件匣', diaryEntries: '日記', ideas: 'Idea', learningLogs: '學習', classNotes: '上課重點',
     books: '閱讀書庫', todos: '待辦', bookmarks: '常用網頁', accountHints: '帳號提示', snippets: '常用片段'
   };
 
@@ -341,13 +346,15 @@
     clientId: DEFAULT_GOOGLE_CLIENT_ID,
     data: null,
     pendingDiaryAttachment: null,
+    pendingClassAttachment: null,
     bookFilterStatus: '全部',
+    classFilterMastery: '全部',
     filters: {
-      inbox: '全部', diary: '全部', ideas: '全部', learning: '全部',
+      inbox: '全部', diary: '全部', ideas: '全部', learning: '全部', classes: '全部',
       books: '全部', todos: '全部', bookmarks: '全部', snippets: '全部', vault: '全部'
     },
     pages: {
-      inbox: 1, diary: 1, ideas: 1, learning: 1,
+      inbox: 1, diary: 1, ideas: 1, learning: 1, classes: 1,
       books: 1, todos: 1, bookmarks: 1, snippets: 1, vault: 1, trash: 1
     },
     pageSize: 6,
@@ -512,6 +519,18 @@
           resourceUrl: '', date: todayStr(-1), tags: ['論文', '閱讀'], updatedAt: new Date().toISOString()
         }
       ],
+      classNotes: [
+        {
+          id: 'c_1', category: 'AI 與技術實作', courseName: 'LLM 應用與提示詞工程實戰（範例）',
+          lessonTitle: '第 03 堂：結構化輸出與工作流拆解', date: todayStr(0),
+          instructor: '線上課程', mastery: '需複習',
+          materialUrl: '',
+          keyPoints: '1. 複雜任務要拆成「探索 → 結構化 → 驗證」三階段。\n2. 提供明確的輸出欄位與反例，能大幅降低幻覺率。',
+          questions: '實務上長文件分段摘要時，Overlap 重疊比例設多少最合適？',
+          homework: '用今天學的架構改寫一份自己的個人知識整理提示詞。',
+          tags: ['AI', '效率系統'], attachment: null, updatedAt: new Date().toISOString()
+        }
+      ],
       books: [
         {
           id: 'b_1', title: '原子習慣（範例）', author: 'James Clear', category: '自我成長',
@@ -568,7 +587,7 @@
   function ensureDataShape(d) {
     const seed = createSeedData();
     const out = Object.assign({}, seed, d || {});
-    ['inbox', 'diaryEntries', 'ideas', 'learningLogs', 'books', 'todos', 'bookmarks', 'accountHints', 'snippets', 'trash'].forEach(k => {
+    ['inbox', 'diaryEntries', 'ideas', 'learningLogs', 'classNotes', 'books', 'todos', 'bookmarks', 'accountHints', 'snippets', 'trash'].forEach(k => {
       if (!Array.isArray(out[k])) out[k] = [];
     });
     const cutoff = Date.now() - 30 * 86400000;
@@ -782,6 +801,7 @@
             diaryEntries: mergeCollections(state.data.diaryEntries, r.diaryEntries),
             ideas: mergeCollections(state.data.ideas, r.ideas),
             learningLogs: mergeCollections(state.data.learningLogs, r.learningLogs),
+            classNotes: mergeCollections(state.data.classNotes, r.classNotes),
             books: mergeCollections(state.data.books, r.books),
             todos: mergeCollections(state.data.todos, r.todos),
             bookmarks: mergeCollections(state.data.bookmarks, r.bookmarks),
@@ -885,7 +905,7 @@
   // ==================== DERIVED COMPUTATIONS ====================
   function getAllTags() {
     const counts = {};
-    [state.data.diaryEntries, state.data.ideas, state.data.learningLogs, state.data.books, state.data.todos, state.data.bookmarks, state.data.accountHints, state.data.snippets]
+    [state.data.diaryEntries, state.data.ideas, state.data.learningLogs, state.data.classNotes, state.data.books, state.data.todos, state.data.bookmarks, state.data.accountHints, state.data.snippets]
       .forEach(arr => arr.forEach(item => (item.tags || []).forEach(t => { counts[t] = (counts[t] || 0) + 1; })));
     return Object.entries(counts).sort((a, b) => b[1] - a[1]);
   }
@@ -913,7 +933,7 @@
     if (!q) return true;
     const text = [
       obj.title, obj.content, obj.notes, obj.topic, obj.milestone, obj.url,
-      obj.author, obj.category, obj.oneLiner, obj.takeaways, obj.quotes,
+      obj.author, obj.category, obj.oneLiner, obj.takeaways, obj.quotes, obj.courseName, obj.lessonTitle, obj.instructor, obj.keyPoints, obj.questions, obj.homework,
       obj.serviceName, obj.loginEmail, obj.bitwardenFolder, (obj.tags || []).join(' ')
     ].filter(Boolean).join(' ').toLowerCase();
     return text.includes(q.replace(/^#/, ''));
@@ -927,6 +947,7 @@
     document.getElementById('badgeDiary').textContent = state.data.diaryEntries.length;
     document.getElementById('badgeIdeas').textContent = state.data.ideas.length;
     document.getElementById('badgeLearning').textContent = state.data.learningLogs.length;
+    document.getElementById('badgeClasses').textContent = state.data.classNotes.length;
     document.getElementById('badgeBooks').textContent = state.data.books.length;
     document.getElementById('badgeTodos').textContent = state.data.todos.filter(t => !t.done).length;
     document.getElementById('badgeBookmarks').textContent = state.data.bookmarks.length;
@@ -1307,6 +1328,108 @@
       ${renderPaginationBar('learning', pg)}`;
   }
 
+  function renderClasses() {
+    const editing = getEditItem('classes', state.data.classNotes);
+    const cats = getCategoryOptions('classes', state.data.classNotes);
+    const filtered = state.data.classNotes.filter(c =>
+      matchesFilter('classes', c) && (state.classFilterMastery === '全部' || c.mastery === state.classFilterMastery)
+    ).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    const pg = paginateList('classes', filtered);
+    const masteryFilterHtml = `
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-[15px] font-semibold text-slate-500 mr-1">掌握程度：</span>
+        ${['全部', '需複習', '有疑問', '已掌握'].map(m => `<button type="button" data-class-mastery="${m}" class="px-3.5 py-1 rounded-full text-[14px] font-semibold transition ${state.classFilterMastery === m ? 'bg-[#FF7A00] text-white' : 'bg-slate-100 text-slate-700 hover:bg-orange-100'}">${m}</button>`).join('')}
+      </div>`;
+    return `
+      <div class="glass-card rounded-3xl p-6">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+          <h2 class="text-[24px] font-bold">${editing ? '編輯上課學習重點' : '新增上課學習重點'}</h2>
+          ${editing ? `<button type="button" data-cancel-edit="1" class="btn-pill-soft px-4 py-1 text-[14px]">取消編輯</button>` : ''}
+        </div>
+        <form id="formClass" class="space-y-3.5">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <input name="courseName" type="text" required value="${esc(editing?.courseName || '')}" placeholder="課程／科目名稱..." class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+            <input name="lessonTitle" type="text" required value="${esc(editing?.lessonTitle || '')}" placeholder="本堂主題或堂次（如：第 03 堂...）" class="sm:col-span-2 px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            <select name="category" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+              ${cats.map(c => `<option value="${esc(c)}" ${(editing?.category || cats[0]) === c ? 'selected' : ''}>類別：${esc(c)}</option>`).join('')}
+            </select>
+            <input name="date" type="date" value="${esc(editing?.date || todayStr(0))}" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+            <select name="mastery" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+              ${['需複習', '有疑問', '已掌握'].map(m => `<option value="${m}" ${(editing?.mastery || '需複習') === m ? 'selected' : ''}>掌握度：${m}</option>`).join('')}
+            </select>
+            <input name="instructor" type="text" value="${esc(editing?.instructor || '')}" placeholder="老師／平台（選填）" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <input name="materialUrl" type="url" value="${esc(editing?.materialUrl || '')}" placeholder="講義／簡報／課程錄影連結（選填）" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+            <input name="tags" type="text" value="${esc((editing?.tags || []).join(' '))}" placeholder="標籤（如：AI 論文 統計）" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+          </div>
+          <textarea name="keyPoints" rows="3" required placeholder="本堂核心重點（條列關鍵觀念、公式或操作步驟）..." class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">${esc(editing?.keyPoints || '')}</textarea>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <textarea name="questions" rows="2" placeholder="疑問與待查清單（聽不懂的地方，選填）..." class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">${esc(editing?.questions || '')}</textarea>
+            <textarea name="homework" rows="2" placeholder="課後作業與實作練習（選填）..." class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">${esc(editing?.homework || '')}</textarea>
+          </div>
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <label class="btn-pill-soft px-4 py-2 text-[15px] cursor-pointer inline-flex items-center gap-2">
+              <span>📎 上傳課堂截圖或講義（直存 Drive）</span>
+              <input id="classFileInput" type="file" accept="image/*,.pdf,.txt,.md" class="hidden">
+            </label>
+            <span id="classFileName" class="text-[14px] text-slate-500">${esc(state.pendingClassAttachment?.name || editing?.attachment?.name || '')}</span>
+            <button type="submit" class="btn-pill-orange px-7 py-2.5 text-[17px] ml-auto">${editing ? '更新課堂筆記' : '儲存上課重點'}</button>
+          </div>
+        </form>
+      </div>
+      ${renderCategoryBar('classes', state.data.classNotes, masteryFilterHtml)}
+      <div class="space-y-4">
+        ${pg.items.map(c => `
+          <article class="glass-card rounded-3xl p-6">
+            <div class="flex flex-wrap items-start justify-between gap-2 mb-2">
+              <div>
+                <div class="flex flex-wrap items-center gap-2 mb-1">
+                  <span class="px-2.5 py-0.5 rounded-full text-[13px] font-semibold bg-sky-50 text-[#1D5B8C]">${esc(c.category || '學校課程')}</span>
+                  <span class="px-2.5 py-0.5 rounded-full text-[13px] font-semibold ${c.mastery === '已掌握' ? 'bg-emerald-100 text-emerald-800' : c.mastery === '有疑問' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-[#B85200]'}">${esc(c.mastery || '需複習')}</span>
+                  <span class="mono text-[14px] text-slate-500">${esc(c.date || '')}</span>
+                  ${c.instructor ? `<span class="text-[14px] text-slate-500">・${esc(c.instructor)}</span>` : ''}
+                </div>
+                <h3 class="text-[20px] font-bold text-[#1A1D21]">${esc(c.courseName)} — ${esc(c.lessonTitle)}</h3>
+              </div>
+              <div class="flex items-center gap-3 text-[14px] shrink-0">
+                <button type="button" data-start-edit="classes:${c.id}" class="font-semibold text-[#1D5B8C] hover:underline">編輯</button>
+                <button type="button" data-md-class="${c.id}" class="font-semibold text-[#1D5B8C] hover:underline">匯出 .md</button>
+                <button type="button" data-del="classNotes:${c.id}" class="text-slate-400 hover:text-red-600">移至回收桶</button>
+              </div>
+            </div>
+
+            <div class="text-[16px] text-[#1A1D21] whitespace-pre-line bg-slate-50/80 p-4 rounded-2xl mb-3">
+              <strong class="text-slate-600 block mb-1">本堂核心重點：</strong>${esc(c.keyPoints)}
+            </div>
+            ${c.questions ? `<div class="text-[15px] text-red-800 bg-red-50/70 px-4 py-2.5 rounded-2xl mb-2.5 whitespace-pre-line"><strong>❓ 疑問與待查：</strong>${esc(c.questions)}</div>` : ''}
+            ${c.homework ? `<div class="text-[15px] text-[#B85200] bg-orange-50/70 px-4 py-2.5 rounded-2xl mb-2.5 whitespace-pre-line"><strong>📝 課後作業／練習：</strong>${esc(c.homework)}</div>` : ''}
+            ${c.attachment ? `
+              <div class="mb-3 p-3 rounded-2xl bg-slate-50 border border-slate-200 inline-block max-w-full">
+                ${c.attachment.previewDataUrl ? `<img src="${c.attachment.previewDataUrl}" alt="${esc(c.attachment.name)}" class="max-h-52 rounded-xl mb-2 max-w-full h-auto">` : ''}
+                <div class="text-[14px] text-slate-600 flex items-center gap-2">
+                  <span>📎 ${esc(c.attachment.name)}</span>
+                  ${c.attachment.webViewLink ? `<a href="${esc(c.attachment.webViewLink)}" target="_blank" rel="noopener noreferrer" class="text-[#1D5B8C] underline">Drive 檢視 ↗</a>` : ''}
+                </div>
+              </div>` : ''}
+
+            <div class="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
+              <div class="flex flex-wrap items-center gap-1.5">
+                ${c.materialUrl ? `<a href="${esc(c.materialUrl)}" target="_blank" rel="noopener noreferrer" class="text-[14px] font-semibold text-[#1D5B8C] underline mr-2">開啟講義／影片 ↗</a>` : ''}
+                ${(c.tags || []).map(t => `<button type="button" data-hub-tag="${esc(t)}" class="text-[13px] px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600">#${esc(t)}</button>`).join('')}
+              </div>
+              <div class="flex flex-wrap gap-2">
+                ${c.mastery !== '已掌握' ? `<button type="button" data-mark-mastered="${c.id}" class="btn-pill-soft px-3.5 py-1 text-[13px]">✓ 標記已掌握</button>` : ''}
+                <button type="button" data-class-to-todo="${c.id}" class="btn-pill-soft px-3.5 py-1 text-[13px]">作業／疑問轉待辦</button>
+              </div>
+            </div>
+          </article>`).join('') || '<div class="glass-card rounded-3xl p-8 text-center text-slate-500">目前沒有符合條件的上課學習重點</div>'}
+      </div>
+      ${renderPaginationBar('classes', pg)}`;
+  }
+
   function renderBooks() {
     const editing = getEditItem('books', state.data.books);
     const cats = getCategoryOptions('books', state.data.books);
@@ -1638,6 +1761,7 @@
     const learning = state.data.learningLogs.filter(hasTag);
     const todos = state.data.todos.filter(hasTag);
     const books = state.data.books.filter(hasTag);
+    const classes = state.data.classNotes.filter(hasTag);
     const bookmarks = state.data.bookmarks.filter(hasTag);
     const snippets = state.data.snippets.filter(hasTag);
     return `
@@ -1654,7 +1778,7 @@
       ${tag ? `
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div class="glass-card rounded-3xl p-6"><h3 class="text-[19px] font-bold mb-3 text-[#B85200]">相關待辦（${todos.length}）</h3><ul class="space-y-2 text-[16px]">${todos.map(t => `<li>${t.done ? '✓' : '○'} ${esc(t.title)}</li>`).join('') || '<li class="text-slate-400">無</li>'}</ul></div>
-          <div class="glass-card rounded-3xl p-6"><h3 class="text-[19px] font-bold mb-3 text-[#1D5B8C]">相關學習與書籍（${learning.length + books.length}）</h3><ul class="space-y-2 text-[16px]">${learning.map(l => `<li>[學習] ${esc(l.topic)} — <strong class="mono">${l.progressPct}%</strong></li>`).join('')}${books.map(b => `<li>[書籍] 《${esc(b.title)}》（${esc(b.status)}）</li>`).join('')}${(learning.length + books.length === 0) ? '<li class="text-slate-400">無</li>' : ''}</ul></div>
+          <div class="glass-card rounded-3xl p-6"><h3 class="text-[19px] font-bold mb-3 text-[#1D5B8C]">相關學習・上課重點・書籍（${learning.length + classes.length + books.length}）</h3><ul class="space-y-2 text-[16px]">${learning.map(l => `<li>[學習] ${esc(l.topic)} — <strong class="mono">${l.progressPct}%</strong></li>`).join('')}${classes.map(c => `<li>[上課] ${esc(c.courseName)}：${esc(c.lessonTitle)}（${esc(c.mastery)}）</li>`).join('')}${books.map(b => `<li>[書籍] 《${esc(b.title)}》（${esc(b.status)}）</li>`).join('')}${(learning.length + classes.length + books.length === 0) ? '<li class="text-slate-400">無</li>' : ''}</ul></div>
           <div class="glass-card rounded-3xl p-6"><h3 class="text-[19px] font-bold mb-3">相關 Idea（${ideas.length}）</h3><ul class="space-y-2 text-[16px]">${ideas.map(i => `<li>• ${esc(i.title)}（${esc(i.status)}）</li>`).join('') || '<li class="text-slate-400">無</li>'}</ul></div>
           <div class="glass-card rounded-3xl p-6"><h3 class="text-[19px] font-bold mb-3">相關日記・網頁・片段（${diaries.length + bookmarks.length + snippets.length}）</h3><ul class="space-y-2 text-[16px]">${diaries.map(d => `<li><span class="mono text-[14px] text-slate-500">${esc(d.date)}</span> ${esc(d.content.slice(0, 38))}...</li>`).join('')}${bookmarks.map(b => `<li>[網頁] <a href="${esc(b.url)}" target="_blank" rel="noopener noreferrer" class="text-[#1D5B8C] underline">${esc(b.title)}</a></li>`).join('')}${snippets.map(s => `<li>[片段] ${esc(s.title)}</li>`).join('')}${(diaries.length + bookmarks.length + snippets.length === 0) ? '<li class="text-slate-400">無</li>' : ''}</ul></div>
         </div>` : ''}`;
@@ -1697,7 +1821,7 @@
     renderSidebar();
     const views = {
       dashboard: renderDashboard, inbox: renderInbox, diary: renderDiary,
-      ideas: renderIdeas, learning: renderLearning, books: renderBooks,
+      ideas: renderIdeas, learning: renderLearning, classes: renderClasses, books: renderBooks,
       todos: renderTodos, bookmarks: renderBookmarks, snippets: renderSnippets,
       vault: renderVault, hub: renderProjectHub, trash: renderTrash
     };
@@ -1807,6 +1931,76 @@
         milestone: String(fd.get('milestone') || '').trim(), resourceUrl: editing?.resourceUrl || '',
         date: editing?.date || todayStr(0), tags: parseTags(fd.get('tags'))
       }, '已新增學習紀錄', '已更新學習紀錄');
+    });
+
+
+    const formClass = document.getElementById('formClass');
+    if (formClass) formClass.addEventListener('submit', e => {
+      e.preventDefault(); const fd = new FormData(formClass);
+      const editing = getEditItem('classes', state.data.classNotes);
+      upsertItem('classes', 'classNotes', {
+        courseName: String(fd.get('courseName')).trim(),
+        lessonTitle: String(fd.get('lessonTitle')).trim(),
+        category: fd.get('category'),
+        date: fd.get('date') || todayStr(0),
+        mastery: fd.get('mastery'),
+        instructor: String(fd.get('instructor') || '').trim(),
+        materialUrl: String(fd.get('materialUrl') || '').trim(),
+        keyPoints: String(fd.get('keyPoints')).trim(),
+        questions: String(fd.get('questions') || '').trim(),
+        homework: String(fd.get('homework') || '').trim(),
+        tags: parseTags(fd.get('tags')),
+        attachment: state.pendingClassAttachment || editing?.attachment || null
+      }, '已儲存上課學習重點', '已更新課堂筆記');
+      state.pendingClassAttachment = null;
+    });
+
+    const classFileInput = document.getElementById('classFileInput');
+    if (classFileInput) {
+      classFileInput.addEventListener('change', async (e) => {
+        const file = e.target.files?.[0]; if (!file) return;
+        const nameEl = document.getElementById('classFileName');
+        if (nameEl) nameEl.textContent = `處理中：${file.name}`;
+        let previewDataUrl = '';
+        if (file.type.startsWith('image/') && file.size < 1200000) {
+          previewDataUrl = await new Promise(res => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = () => res(''); r.readAsDataURL(file); });
+        }
+        const driveInfo = await uploadAttachmentToDrive(file);
+        state.pendingClassAttachment = { name: file.name, mimeType: file.type, previewDataUrl, driveFileId: driveInfo?.id || '', webViewLink: driveInfo?.webViewLink || '' };
+        if (nameEl) nameEl.textContent = driveInfo?.id ? `已上傳 Drive：${file.name}` : `已附加：${file.name}`;
+        showToast(driveInfo?.id ? '課堂附件已上傳至 Google Drive' : '已附加課堂檔案');
+      });
+    }
+
+    main.querySelectorAll('[data-class-mastery]').forEach(btn => {
+      btn.addEventListener('click', () => { state.classFilterMastery = btn.dataset.classMastery; state.pages.classes = 1; renderAll(); });
+    });
+    main.querySelectorAll('[data-mark-mastered]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const c = state.data.classNotes.find(x => x.id === btn.dataset.markMastered); if (!c) return;
+        c.mastery = '已掌握'; c.updatedAt = new Date().toISOString(); persistData();
+        showToast(`已標記「${c.lessonTitle}」為已掌握！`);
+      });
+    });
+    main.querySelectorAll('[data-class-to-todo]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const c = state.data.classNotes.find(x => x.id === btn.dataset.classToTodo); if (!c) return;
+        const body = c.homework || c.questions || `複習 ${c.lessonTitle}`;
+        state.data.todos.unshift({
+          id: uid('t'), title: `[課堂] ${c.courseName}：${body.slice(0, 48)}`,
+          category: '行動待辦', dueDate: todayStr(3), done: false, repeat: 'none',
+          sourceIdeaId: '', tags: [...new Set(['上課複習', ...(c.tags || [])])], updatedAt: new Date().toISOString()
+        });
+        persistData(); showToast('已將課堂作業／疑問轉為待辦任務');
+      });
+    });
+    main.querySelectorAll('[data-md-class]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const c = state.data.classNotes.find(x => x.id === btn.dataset.mdClass); if (!c) return;
+        const md = `# ${c.courseName} — ${c.lessonTitle}\n\n- 類別：${c.category || '學校課程'}\n- 日期：${c.date}\n- 老師／平台：${c.instructor || '未填'}\n- 掌握度：${c.mastery}\n- 講義連結：${c.materialUrl || '無'}\n\n## 本堂核心重點\n${c.keyPoints}\n\n## 疑問與待查清單\n${c.questions || '無'}\n\n## 課後作業與實作\n${c.homework || '無'}\n`;
+        downloadTextFile(`class_${c.date}_${c.courseName.replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g, '_')}.md`, md);
+        showToast('已匯出課堂筆記 Markdown');
+      });
     });
 
     const formBook = document.getElementById('formBook');
@@ -2079,6 +2273,7 @@
         `# 個人復盤摘要（近 ${days === 9999 ? '全部' : days + ' 天'}）`, '',
         '## 1. 每日日記', ...diaries.map(d => `- [${d.date}/${d.category || '日常'}] 心情 ${d.mood}/5｜${d.content}`), '',
         '## 2. 學習進度', ...learns.map(l => `- [${l.category || '學習'}] ${l.topic}（${l.progressPct}%・${l.minutesSpent}m）：${l.milestone}`), '',
+        '## 2.5 上課學習重點', ...state.data.classNotes.map(c => `- [${c.category}/${c.mastery}] ${c.courseName} - ${c.lessonTitle}：${c.keyPoints.replace(/\n/g, ' ')}`), '',
         '## 3. 近期閱讀書籍與重點心得', ...state.data.books.map(b => `- [${b.category}/${b.status}] 《${b.title}》：${b.oneLiner || b.takeaways || '無'}`), '',
         '## 4. 進行中的 Idea', ...state.data.ideas.filter(i => i.status !== '封存').map(i => `- [${i.category || '點子'}/${i.status}] ${i.title}：${i.notes}`), '',
         '## 5. 待完成事項', ...state.data.todos.filter(t => !t.done).map(t => `- [${t.category}] ${t.title}（期限：${t.dueDate || '未定'}）`), '',
