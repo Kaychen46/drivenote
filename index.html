@@ -235,6 +235,10 @@
             <span>學習狀態與番茄鐘</span>
             <span id="badgeLearning" class="mono text-[13px] text-slate-500">0</span>
           </button>
+          <button type="button" data-tab="books" class="nav-item w-full text-left px-4 py-2.5 rounded-2xl text-[17px] flex items-center justify-between">
+            <span>閱讀書庫與心得</span>
+            <span id="badgeBooks" class="mono text-[13px] text-slate-500">0</span>
+          </button>
           <button type="button" data-tab="todos" class="nav-item w-full text-left px-4 py-2.5 rounded-2xl text-[17px] flex items-center justify-between">
             <span>待完成與重複任務</span>
             <span id="badgeTodos" class="mono text-[13px] text-slate-500">0</span>
@@ -319,6 +323,9 @@
     clientId: DEFAULT_GOOGLE_CLIENT_ID,
     data: null,
     pendingDiaryAttachment: null,
+    bookFilterStatus: '全部',
+    bookFilterCategory: '全部',
+    editingBookId: '',
     pomo: {
       topicId: '',
       mode: 'focus', // 'focus' (25m) | 'break' (5m)
@@ -482,6 +489,24 @@
           url: 'https://vault.bitwarden.com/', tags: ['資安'], updatedAt: new Date().toISOString()
         }
       ],
+      books: [
+        {
+          id: 'b_1', title: '原子習慣（範例）', author: 'James Clear', category: '自我成長',
+          status: '已讀完', rating: 5, progressPct: 100, finishedDate: todayStr(-5),
+          oneLiner: '每天進步 1%，關鍵不是立大目標，而是打造讓好習慣自然發生的環境系統。',
+          takeaways: '1. 把想養成的習慣縮到兩分鐘內就能開始。\n2. 善用習慣堆疊，把新行為綁在既有日常之後。',
+          quotes: '「你不會上升到目標的高度，你會跌落到系統的層次。」',
+          tags: ['效率系統', '閱讀'], updatedAt: new Date().toISOString()
+        },
+        {
+          id: 'b_2', title: '超速學習（範例）', author: 'Scott Young', category: '專業研究',
+          status: '閱讀中', rating: 4, progressPct: 60, finishedDate: '',
+          oneLiner: '透過後設學習先畫出知識地圖，並用直接練習與提取練習加速內化。',
+          takeaways: '在開始新主題前先花 10% 時間拆解概念、事實與程序三類知識。',
+          quotes: '「直接做你想變擅長的那件事，不要只停留在被動閱讀。」',
+          tags: ['論文', '閱讀'], updatedAt: new Date().toISOString()
+        }
+      ],
       trash: []
     };
   }
@@ -489,7 +514,7 @@
   function ensureDataShape(d) {
     const seed = createSeedData();
     const out = Object.assign({}, seed, d || {});
-    ['inbox', 'diaryEntries', 'ideas', 'learningLogs', 'todos', 'accountHints', 'snippets', 'trash'].forEach(k => {
+    ['inbox', 'diaryEntries', 'ideas', 'learningLogs', 'books', 'todos', 'accountHints', 'snippets', 'trash'].forEach(k => {
       if (!Array.isArray(out[k])) out[k] = [];
     });
     // Auto-prune trash older than 30 days
@@ -738,6 +763,7 @@
             diaryEntries: mergeCollections(state.data.diaryEntries, r.diaryEntries),
             ideas: mergeCollections(state.data.ideas, r.ideas),
             learningLogs: mergeCollections(state.data.learningLogs, r.learningLogs),
+            books: mergeCollections(state.data.books, r.books),
             todos: mergeCollections(state.data.todos, r.todos),
             accountHints: mergeCollections(state.data.accountHints, r.accountHints),
             snippets: mergeCollections(state.data.snippets, r.snippets),
@@ -792,7 +818,7 @@
   // ==================== SOFT DELETE & TRASH ====================
   const COLLECTION_LABELS = {
     inbox: '收件匣', diaryEntries: '日記', ideas: 'Idea', learningLogs: '學習',
-    todos: '待辦', accountHints: '帳號提示', snippets: '片段書籤'
+    books: '閱讀書庫', todos: '待辦', accountHints: '帳號提示', snippets: '片段書籤'
   };
 
   function softDeleteItem(col, id) {
@@ -872,7 +898,7 @@
   // ==================== DERIVED COMPUTATIONS ====================
   function getAllTags() {
     const counts = {};
-    [state.data.diaryEntries, state.data.ideas, state.data.learningLogs, state.data.todos, state.data.accountHints, state.data.snippets]
+    [state.data.diaryEntries, state.data.ideas, state.data.learningLogs, state.data.books, state.data.todos, state.data.accountHints, state.data.snippets]
       .forEach(arr => arr.forEach(item => (item.tags || []).forEach(t => { counts[t] = (counts[t] || 0) + 1; })));
     return Object.entries(counts).sort((a, b) => b[1] - a[1]);
   }
@@ -907,7 +933,7 @@
     if (!q) return true;
     const text = [
       obj.title, obj.content, obj.notes, obj.topic, obj.milestone,
-      obj.serviceName, obj.loginEmail, obj.bitwardenFolder, (obj.tags || []).join(' ')
+      obj.author, obj.category, obj.oneLiner, obj.takeaways, obj.quotes, obj.serviceName, obj.loginEmail, obj.bitwardenFolder, (obj.tags || []).join(' ')
     ].filter(Boolean).join(' ').toLowerCase();
     return text.includes(q.replace(/^#/, ''));
   }
@@ -922,6 +948,7 @@
     document.getElementById('badgeDiary').textContent = state.data.diaryEntries.length;
     document.getElementById('badgeIdeas').textContent = state.data.ideas.length;
     document.getElementById('badgeLearning').textContent = state.data.learningLogs.length;
+    document.getElementById('badgeBooks').textContent = state.data.books.length;
     document.getElementById('badgeTodos').textContent = state.data.todos.filter(t => !t.done).length;
     document.getElementById('badgeVault').textContent = state.data.accountHints.length;
     document.getElementById('badgeSnippets').textContent = state.data.snippets.length;
@@ -999,8 +1026,8 @@
           <div class="text-3xl font-bold text-[#1D5B8C] mt-1 mono">${weekLearnMins}m</div>
         </div>
         <div class="glass-card rounded-3xl p-5">
-          <div class="text-[15px] text-[#525B66]">待整理收件匣</div>
-          <div class="text-3xl font-bold text-[#1A1D21] mt-1 mono">${state.data.inbox.length}</div>
+          <div class="text-[15px] text-[#525B66]">已完讀書籍</div>
+          <div class="text-3xl font-bold text-[#1A1D21] mt-1 mono">${state.data.books.filter(b => b.status === '已讀完').length} <span class="text-[14px] font-normal text-slate-400">/ 共 ${state.data.books.length} 本</span></div>
         </div>
       </div>
 
@@ -1293,6 +1320,128 @@
     `;
   }
 
+  const BOOK_CATEGORIES = ['自我成長', '商業理財', '科技與AI', '專業研究', '心理社科', '文學小說', '生活風格', '其他'];
+
+  function renderBooks() {
+    const editing = state.editingBookId ? state.data.books.find(b => b.id === state.editingBookId) : null;
+    const allCats = [...new Set([...BOOK_CATEGORIES, ...state.data.books.map(b => b.category).filter(Boolean)])];
+    const books = state.data.books.filter(b => {
+      if (!matchesSearch(b)) return false;
+      if (state.bookFilterStatus !== '全部' && b.status !== state.bookFilterStatus) return false;
+      if (state.bookFilterCategory !== '全部' && b.category !== state.bookFilterCategory) return false;
+      return true;
+    });
+    const statusOrder = { '閱讀中': 0, '已讀完': 1, '想讀': 2 };
+    books.sort((a, b) => (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9));
+
+    return `
+      <div class="glass-card rounded-3xl p-6">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+          <h2 class="text-[24px] font-bold">${editing ? '編輯書籍與重點心得' : '新增閱讀書籍與心得'}</h2>
+          ${editing ? `<button id="btnCancelEditBook" type="button" class="btn-pill-soft px-4 py-1 text-[14px]">取消編輯</button>` : ''}
+        </div>
+        <form id="formBook" class="space-y-3.5">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <input name="title" type="text" required value="${esc(editing?.title || '')}" placeholder="書名..." class="sm:col-span-2 px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+            <input name="author" type="text" value="${esc(editing?.author || '')}" placeholder="作者（選填）" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            <select name="category" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+              ${allCats.map(c => `<option value="${esc(c)}" ${(editing?.category || '自我成長') === c ? 'selected' : ''}>分類：${esc(c)}</option>`).join('')}
+            </select>
+            <select name="status" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+              <option value="閱讀中" ${(editing?.status || '閱讀中') === '閱讀中' ? 'selected' : ''}>閱讀中</option>
+              <option value="已讀完" ${editing?.status === '已讀完' ? 'selected' : ''}>已讀完</option>
+              <option value="想讀" ${editing?.status === '想讀' ? 'selected' : ''}>想讀</option>
+            </select>
+            <select name="rating" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+              ${[5,4,3,2,1].map(r => `<option value="${r}" ${(editing?.rating ?? 5) === r ? 'selected' : ''}>${'★'.repeat(r)} (${r}星)</option>`).join('')}
+            </select>
+            <input name="finishedDate" type="date" value="${esc(editing?.finishedDate || '')}" title="完讀日期（選填）" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+            <label class="flex items-center gap-3 text-[16px]">
+              <span class="font-semibold shrink-0">閱讀進度：</span>
+              <input id="bookRange" name="progressPct" type="range" min="0" max="100" value="${editing?.progressPct ?? 20}" class="flex-1 accent-[#FF7A00]">
+              <span id="bookRangeVal" class="mono font-bold text-[#FF7A00] w-12">${editing?.progressPct ?? 20}%</span>
+            </label>
+            <input name="tags" type="text" value="${esc((editing?.tags || []).join(' '))}" placeholder="標籤（如：論文 效率系統）" class="px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+          </div>
+          <input name="oneLiner" type="text" value="${esc(editing?.oneLiner || '')}" placeholder="一句話核心收穫（這本書帶給你最大的啟發）..." class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">
+          <textarea name="takeaways" rows="3" placeholder="重點心得與行動轉化（條列重點、觀點改變或想實踐的方法）..." class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">${esc(editing?.takeaways || '')}</textarea>
+          <textarea name="quotes" rows="2" placeholder="書中金句與頁碼摘錄（選填）..." class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-[17px]">${esc(editing?.quotes || '')}</textarea>
+          <div class="flex justify-end">
+            <button type="submit" class="btn-pill-orange px-7 py-2.5 text-[17px]">${editing ? '更新書籍心得' : '收入閱讀書庫'}</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Status & Category Filter Bar -->
+      <div class="glass-card rounded-3xl p-5 space-y-3">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-[15px] font-semibold text-slate-500 mr-1">狀態：</span>
+          ${['全部', '閱讀中', '已讀完', '想讀'].map(st => `
+            <button type="button" data-book-status="${st}" class="px-3.5 py-1 rounded-full text-[15px] font-semibold transition ${state.bookFilterStatus === st ? 'bg-[#FF7A00] text-white' : 'bg-slate-100 text-slate-700 hover:bg-orange-100'}">${st}</button>
+          `).join('')}
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-[15px] font-semibold text-slate-500 mr-1">分類：</span>
+          ${['全部', ...allCats].map(cat => `
+            <button type="button" data-book-cat="${esc(cat)}" class="px-3.5 py-1 rounded-full text-[14px] font-semibold transition ${state.bookFilterCategory === cat ? 'bg-[#1D5B8C] text-white' : 'bg-slate-100 text-slate-700 hover:bg-sky-100'}">${esc(cat)}</button>
+          `).join('')}
+        </div>
+      </div>
+
+      <div class="space-y-4">
+        ${books.map(b => `
+          <article class="glass-card rounded-3xl p-6">
+            <div class="flex flex-wrap items-start justify-between gap-2 mb-2">
+              <div>
+                <div class="flex flex-wrap items-center gap-2 mb-1">
+                  <h3 class="text-[21px] font-bold text-[#1A1D21]">${esc(b.title)}</h3>
+                  <span class="px-2.5 py-0.5 rounded-full text-[13px] font-semibold bg-sky-50 text-[#1D5B8C]">${esc(b.category || '未分類')}</span>
+                  <span class="px-2.5 py-0.5 rounded-full text-[13px] font-semibold ${b.status === '已讀完' ? 'bg-emerald-100 text-emerald-800' : b.status === '閱讀中' ? 'bg-orange-100 text-[#B85200]' : 'bg-slate-100 text-slate-600'}">${esc(b.status)}</span>
+                </div>
+                <div class="text-[15px] text-slate-500 flex flex-wrap items-center gap-3">
+                  ${b.author ? `<span>作者：${esc(b.author)}</span>` : ''}
+                  <span class="text-[#FF7A00] font-semibold">${'★'.repeat(b.rating || 5)}</span>
+                  ${b.finishedDate ? `<span class="mono">完讀 ${esc(b.finishedDate)}</span>` : ''}
+                </div>
+              </div>
+              <div class="flex items-center gap-3 text-[14px]">
+                <button type="button" data-edit-book="${b.id}" class="font-semibold text-[#1D5B8C] hover:underline">編輯</button>
+                <button type="button" data-md-book="${b.id}" class="font-semibold text-[#1D5B8C] hover:underline">匯出 .md</button>
+                <button type="button" data-del="books:${b.id}" class="text-slate-400 hover:text-red-600">移至回收桶</button>
+              </div>
+            </div>
+
+            ${b.status !== '想讀' ? `
+              <div class="flex items-center gap-3 my-3">
+                <div class="flex-1 h-2.5 rounded-full bg-slate-100 overflow-hidden">
+                  <div class="h-full rounded-full" style="width:${b.progressPct || 0}%; background: linear-gradient(90deg, #FF7A00, #A6D5F7);"></div>
+                </div>
+                <span class="mono font-bold text-[14px] text-[#1D5B8C] w-11 text-right">${b.progressPct || 0}%</span>
+                ${(b.progressPct || 0) < 100 ? `<button type="button" data-bump-book="${b.id}" class="btn-pill-soft px-3 py-0.5 text-[13px]">+20%</button>` : ''}
+              </div>` : ''}
+
+            ${b.oneLiner ? `<p class="text-[17px] font-semibold text-[#B85200] bg-orange-50/70 px-4 py-2.5 rounded-2xl mb-3">「${esc(b.oneLiner)}」</p>` : ''}
+            ${b.takeaways ? `<div class="text-[16px] text-[#1A1D21] whitespace-pre-line mb-3"><strong class="text-slate-600">重點心得：</strong>\n${esc(b.takeaways)}</div>` : ''}
+            ${b.quotes ? `<blockquote class="border-l-4 border-sky-300 pl-3.5 text-[15px] text-[#525B66] whitespace-pre-line mb-3">${esc(b.quotes)}</blockquote>` : ''}
+
+            <div class="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
+              <div class="flex flex-wrap gap-1.5">
+                ${(b.tags || []).map(t => `<button type="button" data-hub-tag="${esc(t)}" class="text-[13px] px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600">#${esc(t)}</button>`).join('')}
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <button type="button" data-book-to-todo="${b.id}" class="btn-pill-soft px-3.5 py-1 text-[13px]">心得轉待辦</button>
+                <button type="button" data-book-to-snippet="${b.id}" class="btn-pill-soft px-3.5 py-1 text-[13px]">金句存片段</button>
+              </div>
+            </div>
+          </article>`).join('') || '<div class="glass-card rounded-3xl p-8 text-center text-slate-500">這個分類或狀態下目前沒有書籍紀錄</div>'}
+      </div>
+    `;
+  }
+
   function renderTodos() {
     const todos = state.data.todos.filter(matchesSearch).sort((a, b) => Number(a.done) - Number(b.done) || (a.dueDate || '9999').localeCompare(b.dueDate || '9999'));
     const repeatLabels = { none: '單次', daily: '每日重複', weekly: '每週重複', monthly: '每月重複' };
@@ -1460,6 +1609,7 @@
     const learning = state.data.learningLogs.filter(hasTag);
     const todos = state.data.todos.filter(hasTag);
     const snippets = state.data.snippets.filter(hasTag);
+    const books = state.data.books.filter(hasTag);
 
     return `
       <div class="glass-card rounded-3xl p-6">
@@ -1500,8 +1650,9 @@
             <h3 class="text-[19px] font-bold mb-3">相關日記與書籤（${diaries.length + snippets.length}）</h3>
             <ul class="space-y-2 text-[16px]">
               ${diaries.map(d => `<li><span class="mono text-[14px] text-slate-500">${esc(d.date)}</span> ${esc(d.content.slice(0, 42))}...</li>`).join('')}
+              ${books.map(b => `<li>[書籍・${esc(b.category)}] ${esc(b.title)}（${esc(b.status)}）</li>`).join('')}
               ${snippets.map(s => `<li>[書籤] ${esc(s.title)}</li>`).join('')}
-              ${(diaries.length + snippets.length === 0) ? '<li class="text-slate-400">無</li>' : ''}
+              ${(diaries.length + snippets.length + books.length === 0) ? '<li class="text-slate-400">無</li>' : ''}
             </ul>
           </div>
         </div>` : ''}
@@ -1551,6 +1702,7 @@
       diary: renderDiary,
       ideas: renderIdeas,
       learning: renderLearning,
+      books: renderBooks,
       todos: renderTodos,
       vault: renderVault,
       snippets: renderSnippets,
@@ -1735,6 +1887,114 @@
     }
     const btnPomoLogNow = document.getElementById('btnPomoLogNow');
     if (btnPomoLogNow) btnPomoLogNow.addEventListener('click', () => creditPomodoroMinutes(25));
+
+
+    // Books module handlers
+    const bookRange = document.getElementById('bookRange');
+    if (bookRange) {
+      bookRange.addEventListener('input', () => {
+        document.getElementById('bookRangeVal').textContent = `${bookRange.value}%`;
+      });
+    }
+    const btnCancelEditBook = document.getElementById('btnCancelEditBook');
+    if (btnCancelEditBook) {
+      btnCancelEditBook.addEventListener('click', () => { state.editingBookId = ''; renderAll(); });
+    }
+    const formBook = document.getElementById('formBook');
+    if (formBook) {
+      formBook.addEventListener('submit', e => {
+        e.preventDefault();
+        const fd = new FormData(formBook);
+        const status = fd.get('status');
+        const pct = status === '已讀完' ? 100 : Number(fd.get('progressPct') || 0);
+        const finishedDate = fd.get('finishedDate') || (status === '已讀完' ? todayStr(0) : '');
+        const payload = {
+          title: String(fd.get('title')).trim(),
+          author: String(fd.get('author') || '').trim(),
+          category: fd.get('category'),
+          status,
+          rating: Number(fd.get('rating') || 5),
+          progressPct: pct,
+          finishedDate,
+          oneLiner: String(fd.get('oneLiner') || '').trim(),
+          takeaways: String(fd.get('takeaways') || '').trim(),
+          quotes: String(fd.get('quotes') || '').trim(),
+          tags: parseTags(fd.get('tags')),
+          updatedAt: new Date().toISOString()
+        };
+        if (state.editingBookId) {
+          const idx = state.data.books.findIndex(b => b.id === state.editingBookId);
+          if (idx >= 0) state.data.books[idx] = { ...state.data.books[idx], ...payload };
+          state.editingBookId = '';
+          persistData();
+          showToast('已更新書籍與心得');
+        } else {
+          state.data.books.unshift({ id: uid('b'), ...payload });
+          persistData();
+          showToast('已收入閱讀書庫');
+        }
+      });
+    }
+    main.querySelectorAll('[data-book-status]').forEach(btn => {
+      btn.addEventListener('click', () => { state.bookFilterStatus = btn.dataset.bookStatus; renderAll(); });
+    });
+    main.querySelectorAll('[data-book-cat]').forEach(btn => {
+      btn.addEventListener('click', () => { state.bookFilterCategory = btn.dataset.bookCat; renderAll(); });
+    });
+    main.querySelectorAll('[data-edit-book]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.editingBookId = btn.dataset.editBook;
+        renderAll();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    });
+    main.querySelectorAll('[data-bump-book]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const b = state.data.books.find(x => x.id === btn.dataset.bumpBook);
+        if (!b) return;
+        b.progressPct = Math.min(100, Number(b.progressPct || 0) + 20);
+        if (b.progressPct === 100) { b.status = '已讀完'; if (!b.finishedDate) b.finishedDate = todayStr(0); }
+        else if (b.status === '想讀') b.status = '閱讀中';
+        b.updatedAt = new Date().toISOString();
+        persistData();
+        showToast(b.progressPct === 100 ? `恭喜完讀《${b.title}》！` : `進度更新為 ${b.progressPct}%`);
+      });
+    });
+    main.querySelectorAll('[data-book-to-todo]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const b = state.data.books.find(x => x.id === btn.dataset.bookToTodo);
+        if (!b) return;
+        state.data.todos.unshift({
+          id: uid('t'), title: `[閱讀實踐] 《${b.title}》：${(b.oneLiner || b.takeaways || '落實書中重點').slice(0, 42)}`,
+          category: '行動待辦', dueDate: todayStr(3), done: false, repeat: 'none',
+          sourceIdeaId: '', tags: [...new Set(['閱讀', ...(b.tags || [])])], updatedAt: new Date().toISOString()
+        });
+        persistData();
+        showToast('已將書籍心得轉為待辦任務');
+      });
+    });
+    main.querySelectorAll('[data-book-to-snippet]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const b = state.data.books.find(x => x.id === btn.dataset.bookToSnippet);
+        if (!b) return;
+        state.data.snippets.unshift({
+          id: uid('s'), title: `《${b.title}》金句摘錄`, category: '常用片段',
+          content: [b.oneLiner, b.quotes].filter(Boolean).join('\n') || b.takeaways || b.title,
+          url: '', tags: [...new Set(['閱讀', ...(b.tags || [])])], updatedAt: new Date().toISOString()
+        });
+        persistData();
+        showToast('已收入常用片段庫');
+      });
+    });
+    main.querySelectorAll('[data-md-book]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const b = state.data.books.find(x => x.id === btn.dataset.mdBook);
+        if (!b) return;
+        const md = `# 《${b.title}》閱讀心得\n\n- 作者：${b.author || '未填'}\n- 分類：${b.category || '未分類'}\n- 狀態：${b.status}（${b.progressPct}%）\n- 評分：${'★'.repeat(b.rating || 5)}\n- 完讀日期：${b.finishedDate || '進行中'}\n- 標籤：${(b.tags || []).map(t => '#' + t).join(' ')}\n\n## 一句話核心收穫\n${b.oneLiner || '無'}\n\n## 重點心得與行動轉化\n${b.takeaways || '無'}\n\n## 書中金句摘錄\n${b.quotes || '無'}\n`;
+        downloadTextFile(`book_${b.title.replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g, '_')}.md`, md);
+        showToast('已匯出書籍心得 Markdown');
+      });
+    });
 
     // Learning range slider readout
     const learnRange = document.getElementById('learnRange');
@@ -2020,7 +2280,10 @@
         '## 3. 進行中的 Idea',
         ...activeIdeas.map(i => `- [${i.status}/${i.priority}] ${i.title}：${i.notes}`),
         '',
-        '## 4. 待完成事項',
+        '## 4. 近期閱讀書籍與重點心得',
+        ...state.data.books.map(b => `- [${b.category}/${b.status}] 《${b.title}》：${b.oneLiner || b.takeaways || '無'}`),
+        '',
+        '## 5. 待完成事項',
         ...openTodos.map(t => `- [${t.category}] ${t.title}（期限：${t.dueDate || '未定'}）`),
         '',
         '---',
