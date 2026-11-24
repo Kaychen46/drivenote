@@ -187,8 +187,11 @@
 
         <!-- Action Toolbar -->
         <div class="flex items-center gap-2 shrink-0">
-          <button id="btnSyncNow" type="button" class="btn-pill-soft px-3.5 py-1.5 text-[15px] hidden sm:inline-flex items-center gap-1.5" title="立即同步 Google Drive">
-            同步
+          <button id="btnPullDrive" type="button" class="btn-pill-soft px-3 py-1.5 text-[14px] sm:text-[15px] inline-flex items-center gap-1" title="從 Google Drive 匯入雲端資料（換電腦防覆蓋）">
+            匯入雲端
+          </button>
+          <button id="btnSyncNow" type="button" class="btn-pill-soft px-3 py-1.5 text-[14px] sm:text-[15px] inline-flex items-center gap-1" title="手動上傳同步至 Google Drive 並留存時間戳備份">
+            同步上傳
           </button>
           <button id="btnPrivacyToggle" type="button" class="btn-pill-soft px-3.5 py-1.5 text-[15px]" title="切換防窺模糊模式">
             防窺
@@ -309,6 +312,7 @@
   const STORAGE_CLIENT_ID_KEY = 'drivenote_google_client_id';
   const STORAGE_IDLE_KEY = 'drivenote_idle_lock_mins';
   const STORAGE_LAST_BACKUP_KEY = 'drivenote_last_backup_date';
+  const STORAGE_LAST_SYNC_KEY = 'drivenote_last_sync_stamp';
   const DRIVE_FOLDER_NAME = 'MyPersonalNotebook';
   const DRIVE_ATTACH_FOLDER = 'attachments';
   const DRIVE_DATA_FILE = 'notebook_data.json';
@@ -343,6 +347,9 @@
     driveFolderId: null,
     driveAttachFolderId: null,
     lastSyncError: '',
+    lastSyncStamp: '',
+    remoteSyncStamp: '',
+    hasUnsyncedChanges: false,
     clientId: DEFAULT_GOOGLE_CLIENT_ID,
     data: null,
     pendingDiaryAttachment: null,
@@ -379,6 +386,12 @@
     const d = new Date();
     d.setDate(d.getDate() + offsetDays);
     return d.toISOString().slice(0, 10);
+  }
+  function formatStamp(dateInput = new Date()) {
+    const d = dateInput instanceof Date ? dateInput : new Date(dateInput);
+    if (Number.isNaN(d.getTime())) return '';
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
   }
   function nextWeekendStr() {
     const d = new Date();
@@ -702,7 +715,7 @@
           state.lastSyncError = '';
           state.mode = 'google';
           enterWorkspace();
-          await syncWithGoogleDrive(true);
+          await inspectCloudStatusOnly();
         }
       });
       tokenClient.requestAccessToken({ prompt: 'consent' });
@@ -757,34 +770,135 @@
     return [...map.values()];
   }
 
-  async function ensureDailyDriveBackup() {
+  async function inspectCloudStatusOnly() {
+    if (state.mode !== 'google' || !state.accessToken) return;
+    updateSyncBadge('檢查雲端中...', '#FF7A00');
+    try {
+      if (!state.driveFolderId) state.driveFolderId = await ensureDriveFolder(DRIVE_FOLDER_NAME);
+      const q = encodeURIComponent(`name='${DRIVE_DATA_FILE}' and '${state.driveFolderId}' in parents and trashed=false`);
+      const listJson = await (await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,modifiedTime)`)).json();
+      if (listJson.files?.length > 0) {
+        state.driveFileId = listJson.files[0].id;
+        state.remoteSyncStamp = formatStamp(listJson.files[0].modifiedTime);
+        updateSyncBadge(`已連線・雲端 ${state.remoteSyncStamp}`, '#10B981');
+        showToast(`已連線 Google Drive（雲端版本 ${state.remoteSyncStamp}），換電腦請先點「匯入雲端」`);
+      } else {
+        state.remoteSyncStamp = '';
+        updateSyncBadge('已連線・雲端尚無檔案', '#10B981');
+        showToast('已連線 Google Drive，點選「同步上傳」即可建立雲端資料庫');
+      }
+      state.lastSyncError = '';
+    } catch (err) {
+      state.lastSyncError = err?.message || '未知錯誤';
+      updateSyncBadge('雲端檢查失敗', '#EF4444');
+      showToast(`連線檢查失敗：${state.lastSyncError.slice(0, 80)}`);
+    }
+  }
+
+  async function saveTimestampedBackup(stamp) {
     if (state.mode !== 'google' || !state.accessToken || !state.driveFolderId) return;
-    const today = todayStr(0);
-    if (safeGet(STORAGE_LAST_BACKUP_KEY, '') === today) return;
     try {
       const backupFolderId = await ensureDriveFolder('backups', state.driveFolderId);
-      const snapName = `${today}.json`;
-      const q = encodeURIComponent(`name='${snapName}' and '${backupFolderId}' in parents and trashed=false`);
-      const checkJson = await (await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`)).json();
-      if (!checkJson.files || checkJson.files.length === 0) {
-        const cJson = await (await driveFetch('https://www.googleapis.com/drive/v3/files?fields=id', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: snapName, parents: [backupFolderId], mimeType: 'application/json' })
-        })).json();
-        await driveFetch(`https://www.googleapis.com/upload/drive/v3/files/${cJson.id}?uploadType=media`, {
-          method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(state.data, null, 2)
-        });
-      }
-      safeSet(STORAGE_LAST_BACKUP_KEY, today);
+      const snapName = `${stamp}.json`;
+      const cJson = await (await driveFetch('https://www.googleapis.com/drive/v3/files?fields=id', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: snapName, parents: [backupFolderId], mimeType: 'application/json' })
+      })).json();
+      await driveFetch(`https://www.googleapis.com/upload/drive/v3/files/${cJson.id}?uploadType=media`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(state.data, null, 2)
+      });
+      safeSet(STORAGE_LAST_BACKUP_KEY, stamp);
     } catch {}
   }
 
-  async function syncWithGoogleDrive(initialPull = false) {
+  async function pullFromGoogleDrive() {
     if (state.mode !== 'google' || !state.accessToken) {
-      showToast('目前為本機試用模式，已自動儲存在瀏覽器');
+      showToast('請先使用 Google 帳號登入，才能從雲端匯入資料');
       return;
     }
-    updateSyncBadge('同步中...', '#FF7A00');
+    updateSyncBadge('讀取雲端中...', '#FF7A00');
+    try {
+      if (!state.driveFolderId) state.driveFolderId = await ensureDriveFolder(DRIVE_FOLDER_NAME);
+      const q = encodeURIComponent(`name='${DRIVE_DATA_FILE}' and '${state.driveFolderId}' in parents and trashed=false`);
+      const listJson = await (await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,modifiedTime)`)).json();
+      if (!listJson.files?.length) {
+        updateSyncBadge('雲端尚無資料', '#F59E0B');
+        showToast('Google Drive 尚未建立 notebook_data.json，請先點「同步上傳」');
+        return;
+      }
+      state.driveFileId = listJson.files[0].id;
+      const remoteData = await (await driveFetch(`https://www.googleapis.com/drive/v3/files/${state.driveFileId}?alt=media`)).json();
+      const r = ensureDataShape(remoteData);
+      const cloudStamp = r.syncTimestamp || formatStamp(listJson.files[0].modifiedTime);
+      state.remoteSyncStamp = cloudStamp;
+      updateSyncBadge(`雲端版本 ${cloudStamp}`, '#10B981');
+
+      openModal(`
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-[22px] font-bold">匯入 Google Drive 雲端同步資料</h3>
+          <button id="btnCloseModal" type="button" class="text-slate-400 hover:text-slate-700 text-2xl leading-none">×</button>
+        </div>
+        <div class="p-4 rounded-2xl bg-sky-50 border border-sky-200 text-[15px] text-[#1D5B8C] mb-4 space-y-1">
+          <div><strong>雲端時間備註：</strong><span class="mono font-bold">${esc(cloudStamp)}</span></div>
+          <div>內容統計：日記 ${r.diaryEntries.length} 篇・Idea ${r.ideas.length} 筆・學習 ${r.learningLogs.length} 筆・上課 ${r.classNotes.length} 筆・書籍 ${r.books.length} 本・待辦 ${r.todos.length} 筆・網頁 ${r.bookmarks.length} 筆</div>
+        </div>
+        <p class="text-[16px] text-[#525B66] mb-5">請選擇匯入方式（換新電腦或剛開啟瀏覽器時，建議選「完全以雲端覆蓋本機」，避免範例資料混入）：</p>
+        <div class="space-y-3">
+          <button id="btnPullReplace" type="button" class="btn-pill-orange w-full py-3 px-5 text-[16px]">以雲端資料覆蓋本機（換電腦推薦）</button>
+          <button id="btnPullMerge" type="button" class="btn-pill-soft w-full py-3 px-5 text-[16px]">合併雲端與本機（保留兩邊最新修改）</button>
+          <button id="btnCancelModal" type="button" class="w-full py-2 text-[15px] text-slate-500 hover:text-slate-700">取消</button>
+        </div>
+      `);
+      document.getElementById('btnCloseModal').addEventListener('click', closeModal);
+      document.getElementById('btnCancelModal').addEventListener('click', closeModal);
+      document.getElementById('btnPullReplace').addEventListener('click', () => {
+        state.data = r;
+        state.lastSyncStamp = cloudStamp;
+        state.hasUnsyncedChanges = false;
+        safeSet(STORAGE_DATA_KEY, state.data);
+        safeSet(STORAGE_LAST_SYNC_KEY, cloudStamp);
+        closeModal();
+        updateSyncBadge(`已匯入 ${cloudStamp}`, '#10B981');
+        renderAll();
+        showToast(`已成功匯入雲端資料（${cloudStamp}）`);
+      });
+      document.getElementById('btnPullMerge').addEventListener('click', () => {
+        state.data = ensureDataShape({
+          version: 6, updatedAt: new Date().toISOString(), syncTimestamp: cloudStamp,
+          inbox: mergeCollections(state.data.inbox, r.inbox),
+          diaryEntries: mergeCollections(state.data.diaryEntries, r.diaryEntries),
+          ideas: mergeCollections(state.data.ideas, r.ideas),
+          learningLogs: mergeCollections(state.data.learningLogs, r.learningLogs),
+          classNotes: mergeCollections(state.data.classNotes, r.classNotes),
+          books: mergeCollections(state.data.books, r.books),
+          todos: mergeCollections(state.data.todos, r.todos),
+          bookmarks: mergeCollections(state.data.bookmarks, r.bookmarks),
+          accountHints: mergeCollections(state.data.accountHints, r.accountHints),
+          snippets: mergeCollections(state.data.snippets, r.snippets),
+          trash: mergeCollections(state.data.trash, r.trash)
+        });
+        state.lastSyncStamp = cloudStamp;
+        state.hasUnsyncedChanges = true;
+        safeSet(STORAGE_DATA_KEY, state.data);
+        safeSet(STORAGE_LAST_SYNC_KEY, cloudStamp);
+        closeModal();
+        updateSyncBadge(`已合併・待上傳`, '#FF7A00');
+        renderAll();
+        showToast('已完成合併，確認無誤後可點「同步上傳」回存雲端');
+      });
+    } catch (err) {
+      state.lastSyncError = err?.message || '未知錯誤';
+      updateSyncBadge('匯入失敗', '#EF4444');
+      showToast(`匯入失敗：${state.lastSyncError.slice(0, 90)}`);
+    }
+  }
+
+  async function syncWithGoogleDrive(forceOverwrite = false) {
+    if (state.mode !== 'google' || !state.accessToken) {
+      showToast('目前為本機試用模式，請先以 Google 帳號登入再手動同步');
+      return;
+    }
+    updateSyncBadge('上傳同步中...', '#FF7A00');
     try {
       if (!state.driveFolderId) state.driveFolderId = await ensureDriveFolder(DRIVE_FOLDER_NAME);
       const q = encodeURIComponent(`name='${DRIVE_DATA_FILE}' and '${state.driveFolderId}' in parents and trashed=false`);
@@ -792,25 +906,40 @@
 
       if (listJson.files?.length > 0) {
         state.driveFileId = listJson.files[0].id;
-        const remoteData = await (await driveFetch(`https://www.googleapis.com/drive/v3/files/${state.driveFileId}?alt=media`)).json();
-        if (initialPull && remoteData) {
-          const r = ensureDataShape(remoteData);
-          state.data = ensureDataShape({
-            version: 4, updatedAt: new Date().toISOString(),
-            inbox: mergeCollections(state.data.inbox, r.inbox),
-            diaryEntries: mergeCollections(state.data.diaryEntries, r.diaryEntries),
-            ideas: mergeCollections(state.data.ideas, r.ideas),
-            learningLogs: mergeCollections(state.data.learningLogs, r.learningLogs),
-            classNotes: mergeCollections(state.data.classNotes, r.classNotes),
-            books: mergeCollections(state.data.books, r.books),
-            todos: mergeCollections(state.data.todos, r.todos),
-            bookmarks: mergeCollections(state.data.bookmarks, r.bookmarks),
-            accountHints: mergeCollections(state.data.accountHints, r.accountHints),
-            snippets: mergeCollections(state.data.snippets, r.snippets),
-            trash: mergeCollections(state.data.trash, r.trash)
-          });
-          safeSet(STORAGE_DATA_KEY, state.data);
+        const remoteStamp = formatStamp(listJson.files[0].modifiedTime);
+        state.remoteSyncStamp = remoteStamp;
+        if (!forceOverwrite && remoteStamp && state.lastSyncStamp !== remoteStamp) {
+          updateSyncBadge(`雲端較新 ${remoteStamp}`, '#F59E0B');
+          openModal(`
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-[22px] font-bold text-[#B85200]">防覆蓋提醒：雲端有不同版本的資料</h3>
+              <button id="btnCloseModal" type="button" class="text-slate-400 hover:text-slate-700 text-2xl leading-none">×</button>
+            </div>
+            <div class="p-4 rounded-2xl bg-orange-50 border border-orange-200 text-[15px] text-[#B85200] mb-4 space-y-1">
+              <div><strong>雲端最新時間戳：</strong><span class="mono font-bold">${esc(remoteStamp)}</span></div>
+              <div><strong>本機上次同步戳：</strong><span class="mono font-bold">${esc(state.lastSyncStamp || '尚未從雲端匯入')}</span></div>
+            </div>
+            <p class="text-[16px] text-[#525B66] mb-5">為避免這台電腦覆蓋掉別台裝置剛寫的資料，建議先點「改為匯入雲端」；如果你確定要以目前本機畫面為準，再點強制上傳。</p>
+            <div class="space-y-3">
+              <button id="btnSwitchToPull" type="button" class="btn-pill-orange w-full py-3 px-5 text-[16px]">改為「匯入雲端」資料（安全推薦）</button>
+              <button id="btnForcePush" type="button" class="btn-pill-soft w-full py-3 px-5 text-[16px]">確定以本機資料覆蓋上傳至雲端</button>
+              <button id="btnCancelModal" type="button" class="w-full py-2 text-[15px] text-slate-500">取消</button>
+            </div>
+          `);
+          document.getElementById('btnCloseModal').addEventListener('click', closeModal);
+          document.getElementById('btnCancelModal').addEventListener('click', closeModal);
+          document.getElementById('btnSwitchToPull').addEventListener('click', () => { closeModal(); pullFromGoogleDrive(); });
+          document.getElementById('btnForcePush').addEventListener('click', () => { closeModal(); syncWithGoogleDrive(true); });
+          return;
         }
+      }
+
+      const nowStamp = formatStamp(new Date());
+      state.data.syncTimestamp = nowStamp;
+      state.data.updatedAt = new Date().toISOString();
+      safeSet(STORAGE_DATA_KEY, state.data);
+
+      if (state.driveFileId) {
         await driveFetch(`https://www.googleapis.com/upload/drive/v3/files/${state.driveFileId}?uploadType=media`, {
           method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(state.data, null, 2)
         });
@@ -824,28 +953,33 @@
           method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(state.data, null, 2)
         });
       }
+
       state.lastSyncError = '';
-      updateSyncBadge('Drive 已同步', '#10B981');
-      ensureDailyDriveBackup();
+      state.lastSyncStamp = nowStamp;
+      state.remoteSyncStamp = nowStamp;
+      state.hasUnsyncedChanges = false;
+      safeSet(STORAGE_LAST_SYNC_KEY, nowStamp);
+      await saveTimestampedBackup(nowStamp);
+      updateSyncBadge(`已同步 ${nowStamp}`, '#10B981');
       renderAll();
-      showToast('已與 Google Drive 完成同步');
+      showToast(`手動同步完成！時間備註：${nowStamp}`);
     } catch (err) {
       state.lastSyncError = err?.message || '未知錯誤';
-      updateSyncBadge('同步失敗（點設定查看原因）', '#EF4444');
+      updateSyncBadge('同步失敗（點設定查看）', '#EF4444');
       showToast(`同步失敗：${state.lastSyncError.slice(0, 90)}`);
     }
   }
 
-  let syncDebounce = null;
+  // Manual sync only: persistData ONLY saves locally and marks pending status
   function persistData() {
     state.data.updatedAt = new Date().toISOString();
+    state.data.localEditTimestamp = formatStamp(new Date());
+    state.hasUnsyncedChanges = true;
     safeSet(STORAGE_DATA_KEY, state.data);
-    renderAll();
-    if (state.mode === 'google' && state.accessToken) {
-      updateSyncBadge('等待同步...', '#FF7A00');
-      clearTimeout(syncDebounce);
-      syncDebounce = setTimeout(() => syncWithGoogleDrive(false), 1800);
+    if (state.mode === 'google') {
+      updateSyncBadge(`待手動同步 (${state.data.localEditTimestamp})`, '#FF7A00');
     }
+    renderAll();
   }
 
   // ==================== SOFT DELETE & POMODORO ====================
@@ -2301,6 +2435,12 @@
       <div class="flex items-center justify-between mb-4"><h3 class="text-[22px] font-bold">資料備份、閒置鎖定與 Drive 設定</h3><button id="btnCloseModal" type="button" class="text-slate-400 hover:text-slate-700 text-2xl leading-none">×</button></div>
       <div class="space-y-4 text-[16px]">
         ${state.lastSyncError ? `<div class="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-800 text-[14px]"><div class="font-bold mb-1">最近一次同步錯誤訊息：</div><div class="mono break-all">${esc(state.lastSyncError)}</div></div>` : ''}
+        <div class="p-4 rounded-2xl bg-sky-50/70 border border-sky-200 text-[15px] text-[#1D5B8C] space-y-1">
+          <div class="font-bold">同步時間備註（手動同步模式）</div>
+          <div>最後同步／匯入時間：<span class="mono font-bold">${esc(state.lastSyncStamp || '尚未同步')}</span></div>
+          <div>最後本機修改時間：<span class="mono font-bold">${esc(state.data.localEditTimestamp || formatStamp(state.data.updatedAt))}</span></div>
+          <div class="text-[13px] text-slate-600 pt-1">每次點選「同步上傳」皆會自動在 Drive 的 <span class="mono">backups/</span> 資料夾留存 <span class="mono">YYYYMMDD-HHmm.json</span> 備份檔。</div>
+        </div>
         <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-wrap items-center justify-between gap-3">
           <div><div class="font-bold">閒置自動鎖屏</div><div class="text-[14px] text-slate-500">超過設定時間無操作，自動返回登入頁。</div></div>
           <select id="selectIdleLock" class="px-4 py-2 rounded-full bg-white border border-slate-200 text-[15px] font-semibold">
@@ -2334,7 +2474,7 @@
       state.idleLockMinutes = Number(e.target.value); safeSet(STORAGE_IDLE_KEY, state.idleLockMinutes); resetIdleTimer();
       showToast(state.idleLockMinutes ? `已設定閒置 ${state.idleLockMinutes} 分鐘自動鎖屏` : '已關閉自動鎖屏');
     });
-    document.getElementById('btnExportJson').addEventListener('click', () => { downloadTextFile(`notebook_data_${todayStr(0)}.json`, JSON.stringify(state.data, null, 2), 'application/json'); showToast('已匯出 JSON 備份'); });
+    document.getElementById('btnExportJson').addEventListener('click', () => { downloadTextFile(`notebook_data_${formatStamp(new Date())}.json`, JSON.stringify(state.data, null, 2), 'application/json'); showToast('已匯出 JSON 備份'); });
     document.getElementById('inputImportJson').addEventListener('change', e => {
       const file = e.target.files?.[0]; if (!file) return;
       const reader = new FileReader();
@@ -2364,6 +2504,7 @@
 
   function init() {
     state.clientId = safeGet(STORAGE_CLIENT_ID_KEY, DEFAULT_GOOGLE_CLIENT_ID) || DEFAULT_GOOGLE_CLIENT_ID;
+    state.lastSyncStamp = safeGet(STORAGE_LAST_SYNC_KEY, '') || '';
     const savedIdle = safeGet(STORAGE_IDLE_KEY, 15);
     state.idleLockMinutes = typeof savedIdle === 'number' ? savedIdle : 15;
     state.data = ensureDataShape(safeGet(STORAGE_DATA_KEY, null) || createSeedData());
@@ -2374,7 +2515,8 @@
     document.getElementById('btnOpenOAuthConfig').addEventListener('click', openOAuthConfigModal);
     document.getElementById('btnOpenAiExport').addEventListener('click', openAiExportModal);
     document.getElementById('btnOpenSettings').addEventListener('click', openSettingsModal);
-    document.getElementById('btnSyncNow').addEventListener('click', () => syncWithGoogleDrive(true));
+    document.getElementById('btnPullDrive').addEventListener('click', pullFromGoogleDrive);
+    document.getElementById('btnSyncNow').addEventListener('click', () => syncWithGoogleDrive(false));
     document.getElementById('btnPrivacyToggle').addEventListener('click', () => {
       state.privacyBlur = !state.privacyBlur; document.body.classList.toggle('privacy-blur', state.privacyBlur);
       showToast(state.privacyBlur ? '已開啟防窺模糊模式' : '已關閉防窺模糊模式');
